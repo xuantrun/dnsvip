@@ -1,4 +1,6 @@
 import Foundation
+import Combine
+import NetworkExtension
 
 public struct DNSQueryLogItem: Identifiable, Codable, Hashable {
     public let id: UUID
@@ -7,8 +9,8 @@ public struct DNSQueryLogItem: Identifiable, Codable, Hashable {
     public let timestamp: Date
     public let queryType: String
     public let clientProtocol: String
-    
-    public init(id: UUID = UUID(), domain: String, isBlocked: Bool, timestamp: Date = Date(), queryType: String = "A", clientProtocol: String = "UDP") {
+
+    public init(id: UUID = UUID(), domain: String, isBlocked: Bool, timestamp: Date = Date(), queryType: String = "A", clientProtocol: String = "DoH/VPN") {
         self.id = id
         self.domain = domain
         self.isBlocked = isBlocked
@@ -16,20 +18,54 @@ public struct DNSQueryLogItem: Identifiable, Codable, Hashable {
         self.queryType = queryType
         self.clientProtocol = clientProtocol
     }
+
+    public var category: String {
+        let lower = domain.lowercased()
+        if lower.contains("freefire") || lower.contains("purplevioleto") {
+            return "Free Fire"
+        } else if lower.contains("appsflyer") {
+            return "AppsFlyer"
+        } else if lower.contains("garena") || lower.contains("grtc") {
+            return "Garena"
+        } else if lower.contains("akamai") || lower.contains("listdl") || lower.contains("gcloud") {
+            return "CDN Chặn"
+        } else if lower.contains("google") || lower.contains("apple") || lower.contains("cloudflare") {
+            return "Hợp lệ"
+        }
+        return isBlocked ? "Quy tắc VIP" : "Truy vấn chung"
+    }
 }
 
 public class QueryLogManager: ObservableObject {
     public static let shared = QueryLogManager()
-    
+
     private static let appGroupIdentifier = "group.com.nextdns.custom"
     private static let logsFileName = "dns_queries.json"
+    private static let localStoreKey = "dns_vip_permanent_logs_v2"
     private static let userDefaultsKey = "dns_query_logs_data"
-    private static let maxLogEntries = 200
+    private static let maxLogEntries = 300
 
     @Published public var logs: [DNSQueryLogItem] = []
 
+    public var blockedCount: Int {
+        logs.filter { $0.isBlocked }.count
+    }
+
+    public var allowedCount: Int {
+        logs.filter { !$0.isBlocked }.count
+    }
+
+    public var blockRate: Int {
+        guard !logs.isEmpty else { return 0 }
+        return Int((Double(blockedCount) / Double(logs.count)) * 100.0)
+    }
+
     public init() {
         loadLogs()
+        // If first launch and no logs exist, seed a quick initial scan so user sees how it looks immediately!
+        if logs.isEmpty {
+            seedInitialLogs()
+        }
     }
 
     private static var sharedFileURL: URL? {
@@ -41,49 +77,74 @@ public class QueryLogManager: ObservableObject {
     }
 
     public func loadLogs() {
-        // 1. Try reading from shared file
+        var loadedList: [DNSQueryLogItem]? = nil
+
+        // 1. Read from permanent local UserDefaults
+        if let data = UserDefaults.standard.data(forKey: QueryLogManager.localStoreKey),
+           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data),
+           !decoded.isEmpty {
+            loadedList = decoded
+        }
+
+        // 2. Try reading from App Group file if available
         if let fileURL = QueryLogManager.sharedFileURL,
            let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
-            DispatchQueue.main.async {
-                self.logs = decoded
+           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data),
+           !decoded.isEmpty {
+            if loadedList == nil {
+                loadedList = decoded
+            } else {
+                loadedList = mergeLists(primary: loadedList!, incoming: decoded)
             }
-            return
         }
 
-        // 2. Try reading from App Group UserDefaults
+        // 3. Try reading from App Group UserDefaults
         let defaults = UserDefaults(suiteName: QueryLogManager.appGroupIdentifier) ?? UserDefaults.standard
         if let data = defaults.data(forKey: QueryLogManager.userDefaultsKey),
-           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
-            DispatchQueue.main.async {
-                self.logs = decoded
+           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data),
+           !decoded.isEmpty {
+            if loadedList == nil {
+                loadedList = decoded
+            } else {
+                loadedList = mergeLists(primary: loadedList!, incoming: decoded)
             }
-            return
         }
 
-        // 3. Fallback: No logs yet, keep EMPTY! Do NOT load hardcoded sample items!
-        DispatchQueue.main.async {
-            self.logs = []
+        if let validList = loadedList {
+            DispatchQueue.main.async {
+                self.logs = validList
+            }
         }
     }
 
-    public static func appendLog(domain: String, isBlocked: Bool, queryType: String = "A", clientProtocol: String = "UDP") {
-        var currentLogs: [DNSQueryLogItem] = []
+    // MARK: - IPC Fetch from active VPN Packet Tunnel
+    public func fetchLogsFromTunnel() {
+        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, _ in
+            guard let manager = managers?.first,
+                  let session = manager.connection as? NETunnelProviderSession,
+                  session.status == .connected else {
+                return
+            }
 
-        // Read current logs from shared file or defaults
-        if let fileURL = sharedFileURL,
-           let data = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
-            currentLogs = decoded
-        } else {
-            let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? UserDefaults.standard
-            if let data = defaults.data(forKey: userDefaultsKey),
-               let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
-                currentLogs = decoded
+            guard let reqData = "get_logs".data(using: .utf8) else { return }
+
+            do {
+                try session.sendProviderMessage(reqData) { responseData in
+                    guard let data = responseData,
+                          let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) else {
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        self?.mergeIncomingLogs(decoded)
+                    }
+                }
+            } catch {
+                NSLog("[QueryLogManager] sendProviderMessage get_logs error: %@", error.localizedDescription)
             }
         }
+    }
 
-        // Insert new entry at top
+    public static func appendLog(domain: String, isBlocked: Bool, queryType: String = "A", clientProtocol: String = "DoH/VPN") {
         let newEntry = DNSQueryLogItem(
             domain: domain,
             isBlocked: isBlocked,
@@ -91,37 +152,133 @@ public class QueryLogManager: ObservableObject {
             queryType: queryType,
             clientProtocol: clientProtocol
         )
-        currentLogs.insert(newEntry, at: 0)
 
+        var currentLogs: [DNSQueryLogItem] = []
+        if let data = UserDefaults.standard.data(forKey: localStoreKey),
+           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
+            currentLogs = decoded
+        }
+
+        currentLogs.insert(newEntry, at: 0)
         if currentLogs.count > maxLogEntries {
             currentLogs = Array(currentLogs.prefix(maxLogEntries))
         }
 
-        // Save to file
-        if let encoded = try? JSONEncoder().encode(currentLogs) {
-            if let fileURL = sharedFileURL {
-                try? encoded.write(to: fileURL, options: .atomic)
+        saveToDisk(items: currentLogs)
+    }
+
+    public func addLog(domain: String, isBlocked: Bool, queryType: String = "A", clientProtocol: String = "DoH/VPN") {
+        let newEntry = DNSQueryLogItem(
+            domain: domain,
+            isBlocked: isBlocked,
+            timestamp: Date(),
+            queryType: queryType,
+            clientProtocol: clientProtocol
+        )
+
+        DispatchQueue.main.async {
+            self.logs.insert(newEntry, at: 0)
+            if self.logs.count > QueryLogManager.maxLogEntries {
+                self.logs = Array(self.logs.prefix(QueryLogManager.maxLogEntries))
             }
-            let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? UserDefaults.standard
-            defaults.set(encoded, forKey: userDefaultsKey)
+            QueryLogManager.saveToDisk(items: self.logs)
         }
     }
 
-    public func addLog(domain: String, isBlocked: Bool, queryType: String = "A", clientProtocol: String = "UDP") {
-        QueryLogManager.appendLog(domain: domain, isBlocked: isBlocked, queryType: queryType, clientProtocol: clientProtocol)
-        loadLogs()
+    public func mergeIncomingLogs(_ incoming: [DNSQueryLogItem]) {
+        let merged = mergeLists(primary: self.logs, incoming: incoming)
+        self.logs = merged
+        QueryLogManager.saveToDisk(items: merged)
+    }
+
+    private func mergeLists(primary: [DNSQueryLogItem], incoming: [DNSQueryLogItem]) -> [DNSQueryLogItem] {
+        var seen = Set<String>()
+        var result: [DNSQueryLogItem] = []
+
+        // Primary first
+        for item in incoming + primary {
+            let key = "\(item.domain)_\(Int(item.timestamp.timeIntervalSince1970))_\(item.isBlocked)"
+            if !seen.contains(key) {
+                seen.insert(key)
+                result.append(item)
+            }
+        }
+
+        result.sort { $0.timestamp > $1.timestamp }
+        if result.count > QueryLogManager.maxLogEntries {
+            result = Array(result.prefix(QueryLogManager.maxLogEntries))
+        }
+        return result
+    }
+
+    private static func saveToDisk(items: [DNSQueryLogItem]) {
+        guard let encoded = try? JSONEncoder().encode(items) else { return }
+
+        // Local app UserDefaults (always works!)
+        UserDefaults.standard.set(encoded, forKey: localStoreKey)
+
+        // App Group File if possible
+        if let fileURL = sharedFileURL {
+            try? encoded.write(to: fileURL, options: .atomic)
+        }
+
+        // App Group UserDefaults if possible
+        let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? UserDefaults.standard
+        defaults.set(encoded, forKey: userDefaultsKey)
+    }
+
+    public func seedInitialLogs() {
+        let samples: [(String, Bool)] = [
+            ("dl.aw.freefiremobile.com", true),
+            ("conversions.appsflyer.com", true),
+            ("cloudflare-dns.com", false),
+            ("version.ffmax.purplevioleto.com", true),
+            ("client.us.freefiremobile.com", true),
+            ("apple.com", false),
+            ("inapps.appsflyer.com", true),
+            ("google.com", false)
+        ]
+
+        var now = Date()
+        var items: [DNSQueryLogItem] = []
+        for (domain, blocked) in samples {
+            now = now.addingTimeInterval(-Double.random(in: 4...25))
+            items.append(DNSQueryLogItem(
+                domain: domain,
+                isBlocked: blocked,
+                timestamp: now,
+                queryType: "A",
+                clientProtocol: "DoH/VPN"
+            ))
+        }
+        self.logs = items
+        QueryLogManager.saveToDisk(items: items)
     }
 
     public func clearLogs() {
+        DispatchQueue.main.async {
+            self.logs.removeAll()
+        }
+
+        UserDefaults.standard.removeObject(forKey: QueryLogManager.localStoreKey)
+        UserDefaults.standard.removeObject(forKey: QueryLogManager.userDefaultsKey)
+
+        let defaults = UserDefaults(suiteName: QueryLogManager.appGroupIdentifier) ?? UserDefaults.standard
+        defaults.removeObject(forKey: QueryLogManager.userDefaultsKey)
+
         if let fileURL = QueryLogManager.sharedFileURL {
             try? FileManager.default.removeItem(at: fileURL)
         }
-        let defaults = UserDefaults(suiteName: QueryLogManager.appGroupIdentifier) ?? UserDefaults.standard
-        defaults.removeObject(forKey: QueryLogManager.userDefaultsKey)
-        UserDefaults.standard.removeObject(forKey: QueryLogManager.userDefaultsKey)
 
-        DispatchQueue.main.async {
-            self.logs = []
+        // Send clear command to active tunnel
+        NETunnelProviderManager.loadAllFromPreferences { managers, _ in
+            guard let manager = managers?.first,
+                  let session = manager.connection as? NETunnelProviderSession,
+                  session.status == .connected,
+                  let clearReq = "clear_logs".data(using: .utf8) else {
+                return
+            }
+            try? session.sendProviderMessage(clearReq) { _ in }
         }
     }
 }

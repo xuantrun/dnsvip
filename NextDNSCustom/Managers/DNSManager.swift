@@ -38,6 +38,7 @@ public class DNSManager: ObservableObject {
             self.isProxyInstalled = true
             self.statusMessage = "Đang bảo vệ • Đã kích hoạt [VPN] trên thiết bị"
             self.errorMessage = nil
+            QueryLogManager.shared.fetchLogsFromTunnel()
             NSLog("[DNSManager] VPN Status: CONNECTED -> [VPN] icon active!")
         case .connecting:
             self.statusMessage = "Đang kết nối VPN..."
