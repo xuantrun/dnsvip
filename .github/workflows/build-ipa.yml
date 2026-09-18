@@ -53,14 +53,14 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.0
-          name: "NextDNS Custom Blocked v2.0.0"
+          tag_name: v2.1.0
+          name: "NextDNS Custom Blocked v2.1.0 (Full Screen + Live Logs)"
           body: |
-            ## 🚀 NextDNS Custom iOS App
-            - Tích hợp đầy đủ tính năng DNS-over-HTTPS (DoH) và DNS-over-TLS (DoT) giống AppStore.
-            - Yêu cầu cấp quyền cấu hình DNS hệ thống (System DNS Settings).
-            - Tích hợp sẵn danh sách chặn Domain và Wildcard theo yêu cầu.
-            - Hỗ trợ cài đặt qua TrollStore, AltStore, Sideloadly.
+            ## 🚀 NextDNS Custom iOS App v2.1.0
+            - ✅ Giao diện Full Màn Hình (Native Edge-to-Edge) không còn viền đen.
+            - ✅ Quản lý VPN & DNS hệ thống giống app NextDNS chính thức (test.nextdns.io + liên kết Cài đặt iOS).
+            - ✅ Màn hình Kiểm tra Nhật ký DNS (Logs) xem thời gian thực đang chặn những domain nào (FreeFire, Tracking,...).
+            - ✅ Đầy đủ 28 domain exact & 17 wildcard.
           files: build/NextDNS-Custom-Blocked.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

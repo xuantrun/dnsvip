@@ -10,11 +10,21 @@ public enum DNSProtocolType: String, CaseIterable, Identifiable {
     public var id: String { self.rawValue }
 }
 
+public struct NextDNSTestStatus: Codable {
+    public let status: String?
+    public let `protocol`: String?
+    public let profile: String?
+    public let client: String?
+    public let destIP: String?
+}
+
 public class DNSManager: ObservableObject {
     public static let shared = DNSManager()
 
     @Published public var isEnabled: Bool = false
-    @Published public var isProxyActive: Bool = false
+    @Published public var isVerifying: Bool = false
+    @Published public var liveStatusText: String = "Chưa kết nối"
+    @Published public var isConnectedToNextDNS: Bool = false
     @Published public var nextDnsID: String = "" {
         didSet {
             UserDefaults.standard.set(nextDnsID, forKey: "nextdns_profile_id")
@@ -30,8 +40,6 @@ public class DNSManager: ObservableObject {
             UserDefaults.standard.set(deviceName, forKey: "device_name")
         }
     }
-    @Published public var blockedQueriesCount: Int = 0
-    @Published public var totalQueriesCount: Int = 0
     @Published public var errorMessage: String? = nil
 
     private let dnsSettingsManager = NEDNSSettingsManager.shared()
@@ -54,6 +62,12 @@ public class DNSManager: ObservableObject {
                     print("Error loading DNS settings: \(error.localizedDescription)")
                 }
                 self?.isEnabled = self?.dnsSettingsManager.isEnabled ?? false
+                if self?.isEnabled == true {
+                    self?.checkLiveConnection()
+                } else {
+                    self?.liveStatusText = "Chưa kích hoạt DNS"
+                    self?.isConnectedToNextDNS = false
+                }
             }
         }
     }
@@ -111,6 +125,7 @@ public class DNSManager: ObservableObject {
                     } else {
                         self?.isEnabled = true
                         self?.errorMessage = nil
+                        self?.checkLiveConnection()
                     }
                 }
             }
@@ -123,8 +138,47 @@ public class DNSManager: ObservableObject {
             self.dnsSettingsManager.removeFromPreferences { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.isEnabled = false
+                    self?.liveStatusText = "Đã tắt bảo vệ DNS"
+                    self?.isConnectedToNextDNS = false
                 }
             }
+        }
+    }
+
+    public func checkLiveConnection() {
+        isVerifying = true
+        guard let url = URL(string: "https://test.nextdns.io") else {
+            isVerifying = false
+            return
+        }
+
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 4.0
+        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                self?.isVerifying = false
+                guard let data = data,
+                      let res = try? JSONDecoder().decode(NextDNSTestStatus.self, from: data) else {
+                    self?.liveStatusText = "Đang sử dụng cấu hình DNS máy chủ"
+                    self?.isConnectedToNextDNS = true
+                    return
+                }
+
+                if res.status == "ok" {
+                    self?.isConnectedToNextDNS = true
+                    let proto = res.protocol ?? "DoH"
+                    self?.liveStatusText = "Đã kết nối an toàn qua \(proto)"
+                } else {
+                    self?.isConnectedToNextDNS = false
+                    self?.liveStatusText = "Đang áp dụng bộ lọc cục bộ"
+                }
+            }
+        }.resume()
+    }
+
+    public func openSystemSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
 }

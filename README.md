@@ -1,10 +1,10 @@
 # 🚀 NextDNS Custom iOS (Blocked FreeFire & Tracking)
 
-[![Download IPA](https://img.shields.io/badge/Download-NextDNS--Custom--Blocked.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.0.0/NextDNS-Custom-Blocked.ipa)
+[![Download IPA](https://img.shields.io/badge/Download-NextDNS--Custom--Blocked.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.1.0/NextDNS-Custom-Blocked.ipa)
 [![Release](https://img.shields.io/github/v/release/xuantrun/dnsvip?style=for-the-badge)](https://github.com/xuantrun/dnsvip/releases/latest)
 
-> 📲 **TẢI TRỰC TIẾP FILE IPA TẠI ĐÂY:**  
-> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI NEXTDNS-CUSTOM-BLOCKED.IPA](https://github.com/xuantrun/dnsvip/releases/download/v2.0.0/NextDNS-Custom-Blocked.ipa)**  
+> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.1.0 Mới Nhất):**  
+> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI NEXTDNS-CUSTOM-BLOCKED.IPA (v2.1.0)](https://github.com/xuantrun/dnsvip/releases/download/v2.1.0/NextDNS-Custom-Blocked.ipa)**  
 > *(Hoặc xem tất cả phiên bản tại mục: [GitHub Releases](https://github.com/xuantrun/dnsvip/releases))*
 
 ---

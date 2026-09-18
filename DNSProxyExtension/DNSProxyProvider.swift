@@ -66,6 +66,9 @@ public class DNSProxyProvider: NEDNSProxyProvider {
         if let domain = parseDNSQueryDomain(from: packet) {
             let blocked = BlockList.isBlocked(domain: domain)
             
+            // Record query in live log
+            QueryLogManager.appendLog(domain: domain, isBlocked: blocked, queryType: "A", clientProtocol: "UDP")
+
             if blocked {
                 NSLog("[NextDNSProxy] BLOCKED query: %@", domain)
                 if let response = createBlockedDNSResponse(for: packet) {

@@ -2,10 +2,48 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var dnsManager = DNSManager.shared
-    @State private var showingBlocklist = false
-    @State private var showingSettings = false
-    @State private var showingAddDomain = false
-    @State private var newDomainText = ""
+    @StateObject private var logManager = QueryLogManager.shared
+    @State private var selectedTab = 0
+
+    var body: some View {
+        TabView(selection: $selectedTab) {
+            // Tab 1: Dashboard
+            DashboardView()
+                .tabItem {
+                    Label("Trang chủ", systemImage: "shield.fill")
+                }
+                .tag(0)
+
+            // Tab 2: Logs (Check log xem đang chặn gì)
+            LogsView()
+                .tabItem {
+                    Label("Nhật ký", systemImage: "list.bullet.rectangle.portrait.fill")
+                }
+                .badge(logManager.logs.filter { $0.isBlocked }.count)
+                .tag(1)
+
+            // Tab 3: Blocklist
+            BlocklistView()
+                .tabItem {
+                    Label("Danh sách chặn", systemImage: "hand.raised.fill")
+                }
+                .tag(2)
+
+            // Tab 4: Settings
+            SettingsView()
+                .tabItem {
+                    Label("Cài đặt", systemImage: "gearshape.fill")
+                }
+                .tag(3)
+        }
+        .accentColor(.blue)
+    }
+}
+
+// MARK: - Subview Dashboard
+struct DashboardView: View {
+    @ObservedObject private var dnsManager = DNSManager.shared
+    @ObservedObject private var logManager = QueryLogManager.shared
 
     var body: some View {
         NavigationView {
@@ -14,14 +52,14 @@ struct ContentView: View {
                     // Status Shield Hero Card
                     statusCard
 
+                    // System VPN & DNS Management Card (Chuyên quản lý cấu hình hệ thống)
+                    systemDnsManagementCard
+
                     // Configuration Section
                     configSection
 
-                    // Quick Actions / Stats
+                    // Quick Stats Cards
                     statsSection
-
-                    // Blocklist Summary Button
-                    blocklistCard
 
                     Spacer(minLength: 30)
                 }
@@ -30,20 +68,6 @@ struct ContentView: View {
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
             .navigationTitle("NextDNS")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingSettings = true }) {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundColor(.accentColor)
-                    }
-                }
-            }
-            .sheet(isPresented: $showingBlocklist) {
-                BlocklistView()
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsView()
-            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
@@ -54,23 +78,21 @@ struct ContentView: View {
             ZStack {
                 Circle()
                     .fill(dnsManager.isEnabled ? Color.green.opacity(0.15) : Color.gray.opacity(0.12))
-                    .frame(width: 100, height: 100)
+                    .frame(width: 90, height: 90)
                 
                 Image(systemName: dnsManager.isEnabled ? "shield.checkmark.fill" : "shield.slash.fill")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 54, height: 54)
+                    .frame(width: 48, height: 48)
                     .foregroundColor(dnsManager.isEnabled ? .green : .gray)
             }
 
             VStack(spacing: 4) {
-                Text(dnsManager.isEnabled ? "ĐÃ BẬT" : "ĐÃ TẮT")
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
+                Text(dnsManager.isEnabled ? "ĐANG BẢO VỆ" : "CHƯA KÍCH HOẠT")
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
                     .foregroundColor(dnsManager.isEnabled ? .green : .secondary)
 
-                Text(dnsManager.isEnabled 
-                     ? (dnsManager.nextDnsID.isEmpty ? "Đang sử dụng Anycast NextDNS & Chặn theo danh sách" : "Kết nối tới Profile: \(dnsManager.nextDnsID)")
-                     : "Thiết bị chưa được mã hóa và lọc DNS")
+                Text(dnsManager.isEnabled ? dnsManager.liveStatusText : "Chạm công tắc để cấp quyền kích hoạt DNS")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -100,10 +122,97 @@ struct ContentView: View {
             .padding(.top, 4)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
+        .padding(.vertical, 22)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(18)
         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 3)
+    }
+
+    // MARK: - System VPN / DNS Management Card
+    private var systemDnsManagementCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("QUẢN LÝ VPN & DNS HỆ THỐNG")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+                .padding(.leading, 8)
+
+            VStack(spacing: 0) {
+                HStack {
+                    Image(systemName: "network")
+                        .foregroundColor(.blue)
+                        .font(.title3)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Trạng thái Cấu hình iOS")
+                            .font(.headline)
+                        Text(dnsManager.isEnabled ? "Profile DNS đã được cài đặt vào hệ thống" : "Chưa có profile hoạt động")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Circle()
+                        .fill(dnsManager.isEnabled ? Color.green : Color.orange)
+                        .frame(width: 10, height: 10)
+                }
+                .padding(14)
+
+                Divider()
+                    .padding(.leading, 46)
+
+                // Button to open iOS System Settings
+                Button(action: { dnsManager.openSystemSettings() }) {
+                    HStack {
+                        Image(systemName: "gear")
+                            .foregroundColor(.indigo)
+                            .font(.title3)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mở Cài đặt iOS (VPN & Quản lý thiết bị)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
+                            Text("Kiểm tra hoặc gỡ bỏ DNS Profile trong Cài đặt chung")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "arrow.up.forward.app")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    }
+                    .padding(14)
+                }
+
+                Divider()
+                    .padding(.leading, 46)
+
+                // Button to re-verify live status
+                Button(action: { dnsManager.checkLiveConnection() }) {
+                    HStack {
+                        Image(systemName: "arrow.clockwise.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.title3)
+
+                        Text("Kiểm tra trạng thái máy chủ (test.nextdns.io)")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+
+                        Spacer()
+
+                        if dnsManager.isVerifying {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                    }
+                    .padding(14)
+                }
+            }
+            .background(Color(UIColor.secondarySystemGroupedBackground))
+            .cornerRadius(16)
+        }
     }
 
     // MARK: - Configuration Section
@@ -165,7 +274,7 @@ struct ContentView: View {
     // MARK: - Stats Section
     private var statsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("BẢO MẬT & CHẶN")
+            Text("THỐNG KÊ HOẠT ĐỘNG")
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
@@ -180,9 +289,17 @@ struct ContentView: View {
                 )
 
                 statCard(
+                    title: "Đã chặn",
+                    value: "\(logManager.logs.filter { $0.isBlocked }.count)",
+                    sub: "Truy vấn bị ngắt",
+                    icon: "nosign",
+                    iconColor: .orange
+                )
+
+                statCard(
                     title: "Giao thức",
                     value: dnsManager.selectedProtocol == .doh ? "DoH" : "DoT",
-                    sub: "HTTPS / TLS",
+                    sub: "Mã hóa",
                     icon: "lock.shield.fill",
                     iconColor: .green
                 )
@@ -191,16 +308,16 @@ struct ContentView: View {
     }
 
     private func statCard(title: String, value: String, sub: String, icon: String, iconColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(iconColor)
-                    .font(.headline)
+                    .font(.caption)
                 Spacer()
             }
             
             Text(value)
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(.system(size: 20, weight: .bold, design: .rounded))
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -210,43 +327,9 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .padding(14)
+        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
-    }
-
-    // MARK: - Blocklist Card
-    private var blocklistCard: some View {
-        Button(action: { showingBlocklist = true }) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color.orange.opacity(0.15))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "list.bullet.clipboard.fill")
-                        .foregroundColor(.orange)
-                        .font(.headline)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Quản lý danh sách chặn")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    Text("Xem các domain Game, Tracking & SDK bị khóa")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-                    .font(.footnote.bold())
-            }
-            .padding(14)
-            .background(Color(UIColor.secondarySystemGroupedBackground))
-            .cornerRadius(16)
-        }
     }
 }
