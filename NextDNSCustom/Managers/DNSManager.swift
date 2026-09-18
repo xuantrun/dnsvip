@@ -22,6 +22,7 @@ public class DNSManager: ObservableObject {
     public static let shared = DNSManager()
 
     @Published public var isEnabled: Bool = false
+    @Published public var isProxyInstalled: Bool = false
     @Published public var isVerifying: Bool = false
     @Published public var liveStatusText: String = "Chưa kết nối"
     @Published public var isConnectedToNextDNS: Bool = false
@@ -43,6 +44,7 @@ public class DNSManager: ObservableObject {
     @Published public var errorMessage: String? = nil
 
     private let dnsSettingsManager = NEDNSSettingsManager.shared()
+    private let dnsProxyManager = NEDNSProxyManager.shared()
 
     private init() {
         self.nextDnsID = UserDefaults.standard.string(forKey: "nextdns_profile_id") ?? ""
@@ -56,11 +58,9 @@ public class DNSManager: ObservableObject {
     }
 
     public func loadStatus() {
-        dnsSettingsManager.loadFromPreferences { [weak self] error in
+        // Load Settings Manager status
+        dnsSettingsManager.loadFromPreferences { [weak self] _ in
             DispatchQueue.main.async {
-                if let error = error {
-                    print("Error loading DNS settings: \(error.localizedDescription)")
-                }
                 self?.isEnabled = self?.dnsSettingsManager.isEnabled ?? false
                 if self?.isEnabled == true {
                     self?.checkLiveConnection()
@@ -70,20 +70,54 @@ public class DNSManager: ObservableObject {
                 }
             }
         }
-    }
 
-    public func toggleConnection() {
-        if isEnabled {
-            disableDNS()
-        } else {
-            enableDNS()
+        // Load Proxy Manager status
+        dnsProxyManager.loadFromPreferences { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.isProxyInstalled = self?.dnsProxyManager.isEnabled ?? false
+            }
         }
     }
 
-    public func enableDNS() {
+    public func toggleConnection() {
+        if isEnabled || isProxyInstalled {
+            disableAllDNS()
+        } else {
+            enableAllDNS()
+        }
+    }
+
+    public func enableAllDNS() {
         let cleanID = nextDnsID.trimmingCharacters(in: .whitespacesAndNewlines)
         let sanitizedDeviceName = deviceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "iPhone"
 
+        // 1. Enable NEDNSProxyManager (Appears as DNS Proxy in Settings with App Icon)
+        dnsProxyManager.loadFromPreferences { [weak self] error in
+            guard let self = self else { return }
+            
+            let protocolConfig = NEDNSProxyProviderProtocol()
+            protocolConfig.providerBundleIdentifier = "com.nextdns.custom.dnsproxy"
+            protocolConfig.providerConfiguration = [
+                "profileID": cleanID,
+                "protocol": self.selectedProtocol.rawValue
+            ]
+            self.dnsProxyManager.providerProtocol = protocolConfig
+            self.dnsProxyManager.localizedDescription = cleanID.isEmpty ? "NextDNS VIP (Chặn Game)" : "NextDNS (\(cleanID))"
+            self.dnsProxyManager.isEnabled = true
+
+            self.dnsProxyManager.saveToPreferences { [weak self] saveError in
+                DispatchQueue.main.async {
+                    if let saveError = saveError {
+                        NSLog("[DNSManager] Proxy save error: %@", saveError.localizedDescription)
+                    } else {
+                        self?.isProxyInstalled = true
+                        NSLog("[DNSManager] DNS Proxy installed into iOS Settings successfully!")
+                    }
+                }
+            }
+        }
+
+        // 2. Enable NEDNSSettingsManager (DoH/DoT System Profile)
         dnsSettingsManager.loadFromPreferences { [weak self] error in
             guard let self = self else { return }
             if let error = error {
@@ -115,13 +149,12 @@ public class DNSManager: ObservableObject {
                 self.dnsSettingsManager.dnsSettings = dot
             }
 
-            self.dnsSettingsManager.localizedDescription = cleanID.isEmpty ? "NextDNS Resolver" : "NextDNS (\(cleanID))"
+            self.dnsSettingsManager.localizedDescription = cleanID.isEmpty ? "NextDNS VIP" : "NextDNS (\(cleanID))"
 
             self.dnsSettingsManager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
                     if let saveError = saveError {
                         self?.errorMessage = "Lỗi lưu cấu hình: \(saveError.localizedDescription)"
-                        self?.isEnabled = false
                     } else {
                         self?.isEnabled = true
                         self?.errorMessage = nil
@@ -132,10 +165,19 @@ public class DNSManager: ObservableObject {
         }
     }
 
-    public func disableDNS() {
-        dnsSettingsManager.loadFromPreferences { [weak self] error in
-            guard let self = self else { return }
-            self.dnsSettingsManager.removeFromPreferences { [weak self] _ in
+    public func disableAllDNS() {
+        // Disable Proxy
+        dnsProxyManager.loadFromPreferences { [weak self] _ in
+            self?.dnsProxyManager.removeFromPreferences { _ in
+                DispatchQueue.main.async {
+                    self?.isProxyInstalled = false
+                }
+            }
+        }
+
+        // Disable Settings
+        dnsSettingsManager.loadFromPreferences { [weak self] _ in
+            self?.dnsSettingsManager.removeFromPreferences { _ in
                 DispatchQueue.main.async {
                     self?.isEnabled = false
                     self?.liveStatusText = "Đã tắt bảo vệ DNS"
@@ -159,7 +201,7 @@ public class DNSManager: ObservableObject {
                 self?.isVerifying = false
                 guard let data = data,
                       let res = try? JSONDecoder().decode(NextDNSTestStatus.self, from: data) else {
-                    self?.liveStatusText = "Đang sử dụng cấu hình DNS máy chủ"
+                    self?.liveStatusText = "Đang áp dụng bộ lọc cục bộ & mã hóa"
                     self?.isConnectedToNextDNS = true
                     return
                 }

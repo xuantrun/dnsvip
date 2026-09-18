@@ -108,12 +108,12 @@ struct DashboardView: View {
             }
 
             Toggle("", isOn: Binding(
-                get: { dnsManager.isEnabled },
+                get: { dnsManager.isEnabled || dnsManager.isProxyInstalled },
                 set: { val in
                     if val {
-                        dnsManager.enableDNS()
+                        dnsManager.enableAllDNS()
                     } else {
-                        dnsManager.disableDNS()
+                        dnsManager.disableAllDNS()
                     }
                 }
             ))
@@ -145,7 +145,7 @@ struct DashboardView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Trạng thái Cấu hình iOS")
                             .font(.headline)
-                        Text(dnsManager.isEnabled ? "Profile DNS đã được cài đặt vào hệ thống" : "Chưa có profile hoạt động")
+                        Text((dnsManager.isEnabled || dnsManager.isProxyInstalled) ? "Profile DNS đã được cài đặt vào hệ thống" : "Chưa có profile hoạt động")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -153,10 +153,40 @@ struct DashboardView: View {
                     Spacer()
 
                     Circle()
-                        .fill(dnsManager.isEnabled ? Color.green : Color.orange)
+                        .fill((dnsManager.isEnabled || dnsManager.isProxyInstalled) ? Color.green : Color.orange)
                         .frame(width: 10, height: 10)
                 }
                 .padding(14)
+
+                Divider()
+                    .padding(.leading, 46)
+
+                // Button to install .mobileconfig directly
+                Button(action: {
+                    ProfileGenerator.saveAndShareMobileConfig(profileID: dnsManager.nextDnsID, deviceName: dnsManager.deviceName)
+                }) {
+                    HStack {
+                        Image(systemName: "arrow.down.doc.fill")
+                            .foregroundColor(.purple)
+                            .font(.title3)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Cài đặt Hồ sơ DNS vào Cài đặt iOS (.mobileconfig)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.primary)
+                            Text("Thêm trực tiếp vào danh sách Proxy DNS & DNS như trong Cài đặt chung")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "square.and.arrow.down")
+                            .foregroundColor(.purple)
+                            .font(.caption.bold())
+                    }
+                    .padding(14)
+                }
 
                 Divider()
                     .padding(.leading, 46)
@@ -172,7 +202,7 @@ struct DashboardView: View {
                             Text("Mở Cài đặt iOS (VPN & Quản lý thiết bị)")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.primary)
-                            Text("Kiểm tra hoặc gỡ bỏ DNS Profile trong Cài đặt chung")
+                            Text("Chọn tick xanh 'NextDNS' trong Cài đặt DNS")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }

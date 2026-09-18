@@ -20,6 +20,7 @@
 		B10000000000000000000040 /* QueryLogManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* QueryLogManager.swift */; };
 		B10000000000000000000041 /* QueryLogManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* QueryLogManager.swift */; };
 		B10000000000000000000042 /* LogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* LogsView.swift */; };
+		B10000000000000000000050 /* ProfileGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000050 /* ProfileGenerator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -63,6 +64,7 @@
 		A10000000000000000000031 /* DNSProxyExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DNSProxyExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000040 /* QueryLogManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryLogManager.swift; sourceTree = "<group>"; };
 		A10000000000000000000042 /* LogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000050 /* ProfileGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileGenerator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +131,7 @@
 			children = (
 								A10000000000000000000014 /* DNSManager.swift */,
 				A10000000000000000000040 /* QueryLogManager.swift */,
+				A10000000000000000000050 /* ProfileGenerator.swift */,
 				A10000000000000000000015 /* BlockList.swift */,
 			);
 			path = Managers;
@@ -267,6 +270,7 @@
 				B10000000000000000000014 /* DNSManager.swift in Sources */,
 								B10000000000000000000015 /* BlockList.swift in Sources */,
 				B10000000000000000000040 /* QueryLogManager.swift in Sources */,
+				B10000000000000000000050 /* ProfileGenerator.swift in Sources */,
 				B10000000000000000000042 /* LogsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
