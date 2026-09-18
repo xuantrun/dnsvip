@@ -9,9 +9,12 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
         // Configure virtual network tunnel for DNS VIP
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
 
-        // 1. IPv4 Settings: virtual subnet for DNS tunnel
+        // 1. IPv4 Settings: Only route DNS server IP traffic into the tunnel
         let ipv4Settings = NEIPv4Settings(addresses: ["198.18.0.1"], subnetMasks: ["255.255.255.0"])
-        ipv4Settings.includedRoutes = [NEIPv4Route.default()]
+        ipv4Settings.includedRoutes = [
+            NEIPv4Route(destinationAddress: "1.1.1.1", subnetMask: "255.255.255.255"),
+            NEIPv4Route(destinationAddress: "1.0.0.1", subnetMask: "255.255.255.255")
+        ]
         tunnelSettings.ipv4Settings = ipv4Settings
 
         // 2. DNS Settings: System-wide DNS routing with matching for all domains

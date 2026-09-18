@@ -21,8 +21,9 @@ public struct DNSQueryLogItem: Identifiable, Codable, Hashable {
 public class QueryLogManager: ObservableObject {
     public static let shared = QueryLogManager()
     
-    private static let userDefaultsSuite = "group.com.nextdns.custom"
-    private static let logsKey = "dns_query_logs_history"
+    private static let appGroupIdentifier = "group.com.nextdns.custom"
+    private static let logsFileName = "dns_queries.json"
+    private static let userDefaultsKey = "dns_query_logs_data"
     private static let maxLogEntries = 200
 
     @Published public var logs: [DNSQueryLogItem] = []
@@ -31,62 +32,78 @@ public class QueryLogManager: ObservableObject {
         loadLogs()
     }
 
+    private static var sharedFileURL: URL? {
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) {
+            return container.appendingPathComponent(logsFileName)
+        }
+        let urls = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+        return urls.first?.appendingPathComponent(logsFileName)
+    }
+
     public func loadLogs() {
-        let defaults = UserDefaults(suiteName: QueryLogManager.userDefaultsSuite) ?? UserDefaults.standard
-        if let data = defaults.data(forKey: QueryLogManager.logsKey),
+        // 1. Try reading from shared file
+        if let fileURL = QueryLogManager.sharedFileURL,
+           let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
             DispatchQueue.main.async {
                 self.logs = decoded
             }
-        } else {
-            // Populate initial sample/recent logs
-            let sampleDomains = [
-                ("dl.aw.freefiremobile.com", true),
-                ("cdn-settings.appsflyersdk.com", true),
-                ("apple.com", false),
-                ("version.ffmax.purplevioleto.com", true),
-                ("google.com", false),
-                ("conversions.appsflyer.com", true),
-                ("cloudflare.com", false),
-                ("dl.verus.freefiremobile.com", true)
-            ]
-            var initLogs: [DNSQueryLogItem] = []
-            for (idx, item) in sampleDomains.enumerated() {
-                initLogs.append(DNSQueryLogItem(
-                    domain: item.0,
-                    isBlocked: item.1,
-                    timestamp: Date().addingTimeInterval(Double(-idx * 15)),
-                    queryType: "A",
-                    clientProtocol: "DoH"
-                ))
+            return
+        }
+
+        // 2. Try reading from App Group UserDefaults
+        let defaults = UserDefaults(suiteName: QueryLogManager.appGroupIdentifier) ?? UserDefaults.standard
+        if let data = defaults.data(forKey: QueryLogManager.userDefaultsKey),
+           let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
+            DispatchQueue.main.async {
+                self.logs = decoded
             }
-            self.logs = initLogs
-            saveLogsToDisk(initLogs)
+            return
+        }
+
+        // 3. Fallback: No logs yet, keep EMPTY! Do NOT load hardcoded sample items!
+        DispatchQueue.main.async {
+            self.logs = []
         }
     }
 
     public static func appendLog(domain: String, isBlocked: Bool, queryType: String = "A", clientProtocol: String = "UDP") {
-        let defaults = UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
-        var current: [DNSQueryLogItem] = []
-        if let data = defaults.data(forKey: logsKey),
+        var currentLogs: [DNSQueryLogItem] = []
+
+        // Read current logs from shared file or defaults
+        if let fileURL = sharedFileURL,
+           let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
-            current = decoded
+            currentLogs = decoded
+        } else {
+            let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? UserDefaults.standard
+            if let data = defaults.data(forKey: userDefaultsKey),
+               let decoded = try? JSONDecoder().decode([DNSQueryLogItem].self, from: data) {
+                currentLogs = decoded
+            }
         }
-        
-        let newLog = DNSQueryLogItem(
+
+        // Insert new entry at top
+        let newEntry = DNSQueryLogItem(
             domain: domain,
             isBlocked: isBlocked,
             timestamp: Date(),
             queryType: queryType,
             clientProtocol: clientProtocol
         )
-        current.insert(newLog, at: 0)
-        if current.count > maxLogEntries {
-            current = Array(current.prefix(maxLogEntries))
+        currentLogs.insert(newEntry, at: 0)
+
+        if currentLogs.count > maxLogEntries {
+            currentLogs = Array(currentLogs.prefix(maxLogEntries))
         }
 
-        if let encoded = try? JSONEncoder().encode(current) {
-            defaults.set(encoded, forKey: logsKey)
+        // Save to file
+        if let encoded = try? JSONEncoder().encode(currentLogs) {
+            if let fileURL = sharedFileURL {
+                try? encoded.write(to: fileURL, options: .atomic)
+            }
+            let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? UserDefaults.standard
+            defaults.set(encoded, forKey: userDefaultsKey)
         }
     }
 
@@ -96,17 +113,15 @@ public class QueryLogManager: ObservableObject {
     }
 
     public func clearLogs() {
-        let defaults = UserDefaults(suiteName: QueryLogManager.userDefaultsSuite) ?? UserDefaults.standard
-        defaults.removeObject(forKey: QueryLogManager.logsKey)
+        if let fileURL = QueryLogManager.sharedFileURL {
+            try? FileManager.default.removeItem(at: fileURL)
+        }
+        let defaults = UserDefaults(suiteName: QueryLogManager.appGroupIdentifier) ?? UserDefaults.standard
+        defaults.removeObject(forKey: QueryLogManager.userDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: QueryLogManager.userDefaultsKey)
+
         DispatchQueue.main.async {
             self.logs = []
-        }
-    }
-
-    private func saveLogsToDisk(_ items: [DNSQueryLogItem]) {
-        let defaults = UserDefaults(suiteName: QueryLogManager.userDefaultsSuite) ?? UserDefaults.standard
-        if let encoded = try? JSONEncoder().encode(items) {
-            defaults.set(encoded, forKey: QueryLogManager.logsKey)
         }
     }
 }

@@ -6,6 +6,7 @@ struct LogsView: View {
     @State private var searchText = ""
     @State private var showingTestSheet = false
     @State private var testDomainInput = "dl.aw.freefiremobile.com"
+    private let liveTimer = Timer.publish(every: 1.5, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationView {
@@ -70,6 +71,12 @@ struct LogsView: View {
             }
             .sheet(isPresented: $showingTestSheet) {
                 testQuerySheet
+            }
+            .onAppear {
+                logManager.loadLogs()
+            }
+            .onReceive(liveTimer) { _ in
+                logManager.loadLogs()
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())

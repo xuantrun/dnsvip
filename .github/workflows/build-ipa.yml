@@ -38,33 +38,36 @@ jobs:
           mkdir -p build/Payload
           cp -r build/NextDNSCustom.xcarchive/Products/Applications/*.app build/Payload/
           cd build
-          zip -qry DNS-VIP-v2.3.2.ipa Payload
-          cp DNS-VIP-v2.3.2.ipa NextDNS-Custom-Blocked.ipa
+          zip -qry DNS-VIP-v2.3.3.ipa Payload
+          cp DNS-VIP-v2.3.3.ipa NextDNS-Custom-Blocked.ipa
           ls -la *.ipa
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DNS-VIP-v2.3.2-IPA
-          path: build/DNS-VIP-v2.3.2.ipa
+          name: DNS-VIP-v2.3.3-IPA
+          path: build/DNS-VIP-v2.3.3.ipa
           retention-days: 30
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.3.2
-          name: "DNS VIP iOS v2.3.2 (Fix VPN Yêu Cầu Cập Nhật • Bật Icon [VPN] iPhone)"
+          tag_name: v2.3.3
+          name: "DNS VIP iOS v2.3.3 (Giao Diện Chuẩn NextDNS • Fix Nhật Ký Thật • Bật [VPN])"
           body: |
-            ## 🚀 DNS VIP iOS App v2.3.2 (Bản Fix Hoàn Thiện VPN)
+            ## 🚀 DNS VIP iOS App v2.3.3 (NextDNS Pure Edition)
             
-            - 🛡️ **Fix Lỗi 'Yêu cầu cập nhật' trong Cài đặt**: Cập nhật extension sang chuẩn `NEPacketTunnelProvider` tương thích 100% với iOS.
-            - ⚡ **Hiện Biểu Tượng [VPN] Trên iPhone**: Khi bật bảo vệ, app tự động kích hoạt tunnel và hiển thị icon [VPN] trực tiếp trên thanh trạng thái.
-            - 📱 **Hiện Trong Cài Đặt DNS & VPN**: Xuất hiện đồng thời cả trong mục **Cài đặt -> VPN** và **Cài đặt -> DNS** với tên **DNS VIP**.
-            - 🚫 **Chặn Triệt Để 45 Quy Tắc**: 28 domain exact & 17 wildcard lọc sạch game & tracker.
+            - 🎨 **Giao Diện Chuẩn NextDNS**: Thiết kế Inset Grouped tối giản, công tắc gạt toggle iOS nguyên bản, thanh trạng thái kết nối chuyên nghiệp.
+            - 📊 **Fix Triệt Để Nhật Ký Truy Vấn**:
+              * Xóa bỏ hoàn toàn dữ liệu mẫu tự tải (không còn tình trạng out ra vào lại tự load data giả).
+              * Hỗ trợ lưu trữ chia sẻ thời gian thực giữa App & Extension.
+              * Tự động làm mới (Live Auto-refresh 1.5s) khi mở tab Nhật ký.
+            - ⚡ **Kích Hoạt Icon [VPN] Trên iPhone**: Hoàn thiện `NEPacketTunnelProvider`, hiển thị biểu tượng [VPN] góc trên màn hình khi bật bảo vệ.
+            - 🚫 **Bộ Lọc Game & Tracker**: 28 domain exact & 17 wildcard tích hợp sẵn.
           files: |
-            build/DNS-VIP-v2.3.2.ipa
+            build/DNS-VIP-v2.3.3.ipa
             build/NextDNS-Custom-Blocked.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

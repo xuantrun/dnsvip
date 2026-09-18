@@ -1,11 +1,11 @@
 # 🚀 DNS VIP iOS (Tự động cấp quyền VPN & DNS • Chặn FreeFire)
 
-[![Download IPA](https://img.shields.io/badge/Download-DNS--VIP--v2.3.2.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.3.2/DNS-VIP-v2.3.2.ipa)
+[![Download IPA](https://img.shields.io/badge/Download-DNS--VIP--v2.3.3.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.3.3/DNS-VIP-v2.3.3.ipa)
 [![Release](https://img.shields.io/github/v/release/xuantrun/dnsvip?style=for-the-badge)](https://github.com/xuantrun/dnsvip/releases/latest)
 
-> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.3.2 Mới Nhất - Bật Icon [VPN]):**  
-> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI DNS-VIP-v2.3.2.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.2/DNS-VIP-v2.3.2.ipa)**  
-> 👉 **[Link phụ: NextDNS-Custom-Blocked.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.2/NextDNS-Custom-Blocked.ipa)**  
+> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.3.3 - Giao diện NextDNS • Fix Nhật Ký • [VPN]):**  
+> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI DNS-VIP-v2.3.3.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.3/DNS-VIP-v2.3.3.ipa)**  
+> 👉 **[Link phụ: NextDNS-Custom-Blocked.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.3/NextDNS-Custom-Blocked.ipa)**  
 > *(Hoặc xem tất cả phiên bản tại mục: [GitHub Releases](https://github.com/xuantrun/dnsvip/releases))*
 
 ---
