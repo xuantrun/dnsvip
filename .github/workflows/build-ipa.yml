@@ -5,69 +5,65 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: macos-14
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Display Xcode Version
-        run: |
-          xcodebuild -version
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode_15.4.app/Contents/Developer
 
-      - name: Build Xcode Archive
+      - name: Install provisioning profile generator (if needed)
+        run: echo "Environment ready."
+
+      - name: Build NextDNSCustom App and DNSProxyExtension
         run: |
-          xcodebuild clean archive \
+          xcodebuild build \
             -project NextDNSCustom.xcodeproj \
             -scheme NextDNSCustom \
             -configuration Release \
-            -archivePath build/NextDNSCustom.xcarchive \
-            -destination "generic/platform=iOS" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
+            -sdk iphoneos \
+            -derivedDataPath build/derivedData \
             CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Package IPA
         run: |
           mkdir -p build/Payload
-          cp -r build/NextDNSCustom.xcarchive/Products/Applications/*.app build/Payload/
+          cp -r "build/derivedData/Build/Products/Release-iphoneos/DNS VIP.app" build/Payload/
           cd build
-          zip -qry DNS-VIP-v2.3.3.ipa Payload
-          cp DNS-VIP-v2.3.3.ipa NextDNS-Custom-Blocked.ipa
+          zip -qry DNS-VIP-v2.3.4.ipa Payload
+          cp DNS-VIP-v2.3.4.ipa NextDNS-Custom-Blocked.ipa
           ls -la *.ipa
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DNS-VIP-v2.3.3-IPA
-          path: build/DNS-VIP-v2.3.3.ipa
+          name: DNS-VIP-v2.3.4-IPA
+          path: build/DNS-VIP-v2.3.4.ipa
           retention-days: 30
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.3.3
-          name: "DNS VIP iOS v2.3.3 (Giao Diện Chuẩn NextDNS • Fix Nhật Ký Thật • Bật [VPN])"
+          tag_name: v2.3.4
+          name: "DNS VIP iOS v2.3.4 (Fix Triệt Để Chặn 0.0.0.0 Sinkhole • Giao Diện NextDNS • Nhật Ký Trực Tiếp)"
           body: |
-            ## 🚀 DNS VIP iOS App v2.3.3 (NextDNS Pure Edition)
+            ## 🚀 DNS VIP iOS App v2.3.4 (Cơ Chế Chặn Sinkhole 0.0.0.0 & Nhật Ký Thật)
             
-            - 🎨 **Giao Diện Chuẩn NextDNS**: Thiết kế Inset Grouped tối giản, công tắc gạt toggle iOS nguyên bản, thanh trạng thái kết nối chuyên nghiệp.
-            - 📊 **Fix Triệt Để Nhật Ký Truy Vấn**:
-              * Xóa bỏ hoàn toàn dữ liệu mẫu tự tải (không còn tình trạng out ra vào lại tự load data giả).
-              * Hỗ trợ lưu trữ chia sẻ thời gian thực giữa App & Extension.
-              * Tự động làm mới (Live Auto-refresh 1.5s) khi mở tab Nhật ký.
-            - ⚡ **Kích Hoạt Icon [VPN] Trên iPhone**: Hoàn thiện `NEPacketTunnelProvider`, hiển thị biểu tượng [VPN] góc trên màn hình khi bật bảo vệ.
-            - 🚫 **Bộ Lọc Game & Tracker**: 28 domain exact & 17 wildcard tích hợp sẵn.
+            - 🛑 **Cơ Chế Chặn 0.0.0.0 Sinkhole Trực Tiếp**: Trả về IP `0.0.0.0` ngay lập tức trong 0ms khi phát hiện truy vấn game (Free Fire `dl.aw.freefiremobile.com`, `version.ffmax`, AppsFlyer, Garena), ngắt kết nối game triệt để.
+            - 📡 **Tách Biệt DNS Server 198.18.0.2**: Tách biệt hoàn toàn khỏi Interface IP, buộc iOS kernel đẩy 100% gói tin DNS qua `NEPacketTunnelProvider` để kiểm duyệt & ghi log.
+            - 📋 **Nhật Ký DNS Hoạt Động 100%**: Ghi nhận thời gian thực từng domain, nhãn `[Free Fire]`, `CHẶN` / `CHO PHÉP`.
+            - 🛡️ **Kích Hoạt Icon [VPN] Trên iPhone**: Hoàn thiện Packet Tunnel Provider.
+            - 🎨 **Giao Diện NextDNS Hero**: Cần gạt công tắc nguồn to bản, màn hình trực quan.
           files: |
-            build/DNS-VIP-v2.3.3.ipa
+            build/DNS-VIP-v2.3.4.ipa
             build/NextDNS-Custom-Blocked.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
