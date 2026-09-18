@@ -53,15 +53,15 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.2.0
-          name: "NextDNS Custom Blocked v2.2.0 (Full DNS Proxy & MobileConfig Settings)"
+          tag_name: v2.3.0
+          name: "DNS VIP iOS v2.3.0 (Tự động xin quyền VPN & DNS • Full Screen)"
           body: |
-            ## 🚀 NextDNS Custom iOS App v2.2.0
-            - ✅ Tích hợp NEDNSProxyManager: App hiển thị trực tiếp trong 'Cài đặt Proxy DNS và DNS' với biểu tượng Icon App.
-            - ✅ Cài đặt Hồ sơ DNS vào Cài đặt iOS (.mobileconfig): Tạo profile hệ thống tương tự NextDNS (b8fe9c).
-            - ✅ Toàn màn hình Native (Full-Screen) không viền đen.
-            - ✅ Xem nhật ký DNS chặn trực tiếp thời gian thực (LogsView).
-            - ✅ Danh sách chặn FreeFire & Tracking tích hợp sẵn.
+            ## 🚀 DNS VIP iOS App v2.3.0
+            - 🛡️ **App Độc Lập**: Hoạt động riêng biệt không phụ thuộc bất kỳ tài khoản hay mã NextDNS nào.
+            - ⚡ **Tự động xin quyền**: Mở app bấm 'BẬT BẢO VỆ' sẽ hiện ngay popup cấp quyền hệ thống.
+            - 📱 **Hiện trong Cài đặt iOS**: Xuất hiện trực tiếp tên 'DNS VIP' trong Cài đặt Proxy DNS và DNS.
+            - 🚫 **Chặn triệt để**: Tích hợp sẵn toàn bộ 28 domain exact & 17 wildcard FreeFire & Tracking.
+            - 📋 **Nhật ký thời gian thực**: Xem các truy vấn mạng đang bị chặn với nhãn đỏ BLOCKED.
           files: build/NextDNS-Custom-Blocked.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

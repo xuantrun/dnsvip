@@ -7,10 +7,10 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Tab 1: Dashboard
+            // Tab 1: Protection Dashboard
             DashboardView()
                 .tabItem {
-                    Label("Trang chủ", systemImage: "shield.fill")
+                    Label("Bảo vệ", systemImage: "shield.fill")
                 }
                 .tag(0)
 
@@ -25,22 +25,26 @@ struct ContentView: View {
             // Tab 3: Blocklist
             BlocklistView()
                 .tabItem {
-                    Label("Danh sách chặn", systemImage: "hand.raised.fill")
+                    Label("Bộ lọc", systemImage: "hand.raised.fill")
                 }
                 .tag(2)
 
-            // Tab 4: Settings
-            SettingsView()
+            // Tab 4: System Settings
+            SystemInfoView()
                 .tabItem {
-                    Label("Cài đặt", systemImage: "gearshape.fill")
+                    Label("Hệ thống", systemImage: "gearshape.fill")
                 }
                 .tag(3)
         }
         .accentColor(.blue)
+        .onAppear {
+            // Check status on appear
+            dnsManager.loadStatus()
+        }
     }
 }
 
-// MARK: - Subview Dashboard
+// MARK: - Dashboard View
 struct DashboardView: View {
     @ObservedObject private var dnsManager = DNSManager.shared
     @ObservedObject private var logManager = QueryLogManager.shared
@@ -49,16 +53,16 @@ struct DashboardView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    // Status Shield Hero Card
-                    statusCard
+                    // Main Hero Shield Card
+                    heroStatusCard
 
-                    // System VPN & DNS Management Card (Chuyên quản lý cấu hình hệ thống)
-                    systemDnsManagementCard
+                    // System Settings Verification Card
+                    systemRegistrationCard
 
-                    // Configuration Section
-                    configSection
+                    // Direct MobileConfig Profile Card (Shows in iOS Settings DNS list)
+                    profileInstallCard
 
-                    // Quick Stats Cards
+                    // Activity Statistics
                     statsSection
 
                     Spacer(minLength: 30)
@@ -67,32 +71,32 @@ struct DashboardView: View {
                 .padding(.top, 10)
             }
             .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("NextDNS")
+            .navigationTitle("DNS VIP")
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
 
-    // MARK: - Status Card
-    private var statusCard: some View {
+    // MARK: - Hero Status Card
+    private var heroStatusCard: some View {
         VStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(dnsManager.isEnabled ? Color.green.opacity(0.15) : Color.gray.opacity(0.12))
-                    .frame(width: 90, height: 90)
+                    .frame(width: 100, height: 100)
                 
                 Image(systemName: dnsManager.isEnabled ? "shield.checkmark.fill" : "shield.slash.fill")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 52, height: 52)
                     .foregroundColor(dnsManager.isEnabled ? .green : .gray)
             }
 
             VStack(spacing: 4) {
                 Text(dnsManager.isEnabled ? "ĐANG BẢO VỆ" : "CHƯA KÍCH HOẠT")
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .font(.system(size: 22, weight: .heavy, design: .rounded))
                     .foregroundColor(dnsManager.isEnabled ? .green : .secondary)
 
-                Text(dnsManager.isEnabled ? dnsManager.liveStatusText : "Chạm công tắc để cấp quyền kích hoạt DNS")
+                Text(dnsManager.statusMessage)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -107,31 +111,36 @@ struct DashboardView: View {
                     .padding(.horizontal)
             }
 
-            Toggle("", isOn: Binding(
-                get: { dnsManager.isEnabled || dnsManager.isProxyInstalled },
-                set: { val in
-                    if val {
-                        dnsManager.enableAllDNS()
-                    } else {
-                        dnsManager.disableAllDNS()
-                    }
+            // Power Toggle Button
+            Button(action: {
+                dnsManager.toggleProtection()
+            }) {
+                HStack(spacing: 10) {
+                    Image(systemName: dnsManager.isEnabled ? "power.circle.fill" : "power")
+                        .font(.title3.bold())
+                    Text(dnsManager.isEnabled ? "TẮT BẢO VỆ" : "BẬT BẢO VỆ & CHẶN NGAY")
+                        .font(.headline)
                 }
-            ))
-            .labelsHidden()
-            .scaleEffect(1.2)
-            .padding(.top, 4)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(dnsManager.isEnabled ? Color.red.opacity(0.9) : Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(14)
+                .padding(.horizontal, 20)
+            }
+            .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
         .background(Color(UIColor.secondarySystemGroupedBackground))
-        .cornerRadius(18)
+        .cornerRadius(20)
         .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: 3)
     }
 
-    // MARK: - System VPN / DNS Management Card
-    private var systemDnsManagementCard: some View {
+    // MARK: - System Registration Card
+    private var systemRegistrationCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("QUẢN LÝ VPN & DNS HỆ THỐNG")
+            Text("CÀI ĐẶT PROXY DNS & DNS HỆ THỐNG")
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
@@ -143,9 +152,9 @@ struct DashboardView: View {
                         .font(.title3)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Trạng thái Cấu hình iOS")
+                        Text("Trạng thái trong Cài đặt iOS")
                             .font(.headline)
-                        Text((dnsManager.isEnabled || dnsManager.isProxyInstalled) ? "Profile DNS đã được cài đặt vào hệ thống" : "Chưa có profile hoạt động")
+                        Text(dnsManager.isProxyInstalled ? "Đã đăng ký 'DNS VIP' trong Cài đặt Proxy DNS" : "Bấm nút 'Bật bảo vệ' ở trên để cấp quyền vào iOS")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -153,40 +162,10 @@ struct DashboardView: View {
                     Spacer()
 
                     Circle()
-                        .fill((dnsManager.isEnabled || dnsManager.isProxyInstalled) ? Color.green : Color.orange)
+                        .fill(dnsManager.isProxyInstalled ? Color.green : Color.orange)
                         .frame(width: 10, height: 10)
                 }
                 .padding(14)
-
-                Divider()
-                    .padding(.leading, 46)
-
-                // Button to install .mobileconfig directly
-                Button(action: {
-                    ProfileGenerator.saveAndShareMobileConfig(profileID: dnsManager.nextDnsID, deviceName: dnsManager.deviceName)
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.down.doc.fill")
-                            .foregroundColor(.purple)
-                            .font(.title3)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Cài đặt Hồ sơ DNS vào Cài đặt iOS (.mobileconfig)")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.primary)
-                            Text("Thêm trực tiếp vào danh sách Proxy DNS & DNS như trong Cài đặt chung")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "square.and.arrow.down")
-                            .foregroundColor(.purple)
-                            .font(.caption.bold())
-                    }
-                    .padding(14)
-                }
 
                 Divider()
                     .padding(.leading, 46)
@@ -202,7 +181,7 @@ struct DashboardView: View {
                             Text("Mở Cài đặt iOS (VPN & Quản lý thiết bị)")
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundColor(.primary)
-                            Text("Chọn tick xanh 'NextDNS' trong Cài đặt DNS")
+                            Text("Xem và chọn tick xanh 'DNS VIP' trong mục DNS")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
@@ -215,103 +194,66 @@ struct DashboardView: View {
                     }
                     .padding(14)
                 }
-
-                Divider()
-                    .padding(.leading, 46)
-
-                // Button to re-verify live status
-                Button(action: { dnsManager.checkLiveConnection() }) {
-                    HStack {
-                        Image(systemName: "arrow.clockwise.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.title3)
-
-                        Text("Kiểm tra trạng thái máy chủ (test.nextdns.io)")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-
-                        Spacer()
-
-                        if dnsManager.isVerifying {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        }
-                    }
-                    .padding(14)
-                }
             }
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(16)
         }
     }
 
-    // MARK: - Configuration Section
-    private var configSection: some View {
+    // MARK: - Direct MobileConfig Profile Card
+    private var profileInstallCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("CẤU HÌNH NEXTDNS")
+            Text("CÀI ĐẶT HỒ SƠ (.MOBILECONFIG)")
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
 
-            VStack(spacing: 0) {
-                HStack {
-                    Image(systemName: "number.circle.fill")
-                        .foregroundColor(.blue)
-                        .font(.title3)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Profile ID")
-                            .font(.footnote)
+            Button(action: {
+                ProfileGenerator.saveAndShareMobileConfig()
+            }) {
+                HStack(spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.purple.opacity(0.15))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "arrow.down.doc.fill")
+                            .foregroundColor(.purple)
+                            .font(.headline)
+                    }
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Thêm Profile 'DNS VIP' vào máy")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Text("Tạo mục có biểu tượng bánh răng trong Cài đặt DNS")
+                            .font(.caption)
                             .foregroundColor(.secondary)
-                        TextField("Mặc định (Trống) hoặc ID của bạn", text: $dnsManager.nextDnsID)
-                            .font(.system(size: 16, weight: .medium))
-                            .autocapitalization(.none)
-                            .disableAutocorrection(true)
                     }
-                    
-                    if !dnsManager.nextDnsID.isEmpty {
-                        Button(action: { dnsManager.nextDnsID = "" }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-                .padding(14)
 
-                Divider()
-                    .padding(.leading, 46)
+                    Spacer()
 
-                HStack {
-                    Image(systemName: "iphone")
+                    Image(systemName: "plus.circle.fill")
                         .foregroundColor(.purple)
                         .font(.title3)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Tên thiết bị gửi kèm")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                        TextField("VD: iPhone của tôi", text: $dnsManager.deviceName)
-                            .font(.system(size: 16, weight: .medium))
-                    }
                 }
                 .padding(14)
+                .background(Color(UIColor.secondarySystemGroupedBackground))
+                .cornerRadius(16)
             }
-            .background(Color(UIColor.secondarySystemGroupedBackground))
-            .cornerRadius(16)
         }
     }
 
-    // MARK: - Stats Section
+    // MARK: - Activity Statistics
     private var statsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("THỐNG KÊ HOẠT ĐỘNG")
+            Text("THỐNG KÊ BẢO VỆ")
                 .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
 
             HStack(spacing: 12) {
                 statCard(
-                    title: "Domain Chặn",
+                    title: "Quy tắc Chặn",
                     value: "\(BlockList.getExactDomains().count + BlockList.getWildcards().count)",
                     sub: "Tích hợp sẵn",
                     icon: "hand.raised.fill",
@@ -319,18 +261,18 @@ struct DashboardView: View {
                 )
 
                 statCard(
-                    title: "Đã chặn",
+                    title: "Đã ngắt",
                     value: "\(logManager.logs.filter { $0.isBlocked }.count)",
-                    sub: "Truy vấn bị ngắt",
+                    sub: "Truy vấn bị chặn",
                     icon: "nosign",
                     iconColor: .orange
                 )
 
                 statCard(
-                    title: "Giao thức",
-                    value: dnsManager.selectedProtocol == .doh ? "DoH" : "DoT",
-                    sub: "Mã hóa",
-                    icon: "lock.shield.fill",
+                    title: "Chế độ",
+                    value: "Local",
+                    sub: "Chặn trực tiếp",
+                    icon: "bolt.shield.fill",
                     iconColor: .green
                 )
             }
@@ -361,5 +303,65 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(UIColor.secondarySystemGroupedBackground))
         .cornerRadius(16)
+    }
+}
+
+// MARK: - System Info View
+struct SystemInfoView: View {
+    @ObservedObject private var dnsManager = DNSManager.shared
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Trạng thái Ứng dụng")) {
+                    HStack {
+                        Text("Tên ứng dụng")
+                        Spacer()
+                        Text("DNS VIP")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Phiên bản")
+                        Spacer()
+                        Text("2.3 (VIP Edition)")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Cơ chế lọc")
+                        Spacer()
+                        Text("NetworkExtension Proxy")
+                            .foregroundColor(.green)
+                    }
+                }
+
+                Section(header: Text("Máy chủ phân giải gốc (Upstream)")) {
+                    HStack {
+                        Text("Máy chủ an toàn")
+                        Spacer()
+                        Text("Cloudflare DoH / Quad9")
+                            .foregroundColor(.secondary)
+                    }
+                    HStack {
+                        Text("Yêu cầu tài khoản")
+                        Spacer()
+                        Text("Không cần (Tự động)")
+                            .foregroundColor(.green)
+                    }
+                }
+
+                Section(header: Text("Hệ thống")) {
+                    Button(action: { dnsManager.openSystemSettings() }) {
+                        HStack {
+                            Text("Mở Cài đặt iOS")
+                            Spacer()
+                            Image(systemName: "arrow.up.right.square")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Hệ thống")
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }

@@ -3,170 +3,113 @@ import Combine
 import NetworkExtension
 import UIKit
 
-public enum DNSProtocolType: String, CaseIterable, Identifiable {
-    case doh = "DNS-over-HTTPS (DoH)"
-    case dot = "DNS-over-TLS (DoT)"
-    
-    public var id: String { self.rawValue }
-}
-
-public struct NextDNSTestStatus: Codable {
-    public let status: String?
-    public let `protocol`: String?
-    public let profile: String?
-    public let client: String?
-    public let destIP: String?
-}
-
 public class DNSManager: ObservableObject {
     public static let shared = DNSManager()
 
     @Published public var isEnabled: Bool = false
     @Published public var isProxyInstalled: Bool = false
     @Published public var isVerifying: Bool = false
-    @Published public var liveStatusText: String = "Chưa kết nối"
-    @Published public var isConnectedToNextDNS: Bool = false
-    @Published public var nextDnsID: String = "" {
-        didSet {
-            UserDefaults.standard.set(nextDnsID, forKey: "nextdns_profile_id")
-        }
-    }
-    @Published public var selectedProtocol: DNSProtocolType = .doh {
-        didSet {
-            UserDefaults.standard.set(selectedProtocol.rawValue, forKey: "dns_protocol_type")
-        }
-    }
-    @Published public var deviceName: String = "iPhone" {
-        didSet {
-            UserDefaults.standard.set(deviceName, forKey: "device_name")
-        }
-    }
+    @Published public var statusMessage: String = "Sẵn sàng bảo vệ"
+    @Published public var upstreamServer: String = "Cloudflare DoH (1.1.1.1)"
     @Published public var errorMessage: String? = nil
 
-    private let dnsSettingsManager = NEDNSSettingsManager.shared()
     private let dnsProxyManager = NEDNSProxyManager.shared()
+    private let dnsSettingsManager = NEDNSSettingsManager.shared()
 
     private init() {
-        self.nextDnsID = UserDefaults.standard.string(forKey: "nextdns_profile_id") ?? ""
-        if let protoRaw = UserDefaults.standard.string(forKey: "dns_protocol_type"),
-           let proto = DNSProtocolType(rawValue: protoRaw) {
-            self.selectedProtocol = proto
-        }
-        self.deviceName = UserDefaults.standard.string(forKey: "device_name") ?? UIDevice.current.name
-        
         loadStatus()
     }
 
     public func loadStatus() {
-        // Load Settings Manager status
-        dnsSettingsManager.loadFromPreferences { [weak self] _ in
+        // 1. Load DNS Proxy Manager status
+        dnsProxyManager.loadFromPreferences { [weak self] error in
             DispatchQueue.main.async {
-                self?.isEnabled = self?.dnsSettingsManager.isEnabled ?? false
-                if self?.isEnabled == true {
-                    self?.checkLiveConnection()
-                } else {
-                    self?.liveStatusText = "Chưa kích hoạt DNS"
-                    self?.isConnectedToNextDNS = false
+                self?.isProxyInstalled = self?.dnsProxyManager.isEnabled ?? false
+                if self?.isProxyInstalled == true {
+                    self?.isEnabled = true
+                    self?.statusMessage = "Đang kích hoạt Proxy DNS & Chặn Game"
                 }
             }
         }
 
-        // Load Proxy Manager status
-        dnsProxyManager.loadFromPreferences { [weak self] _ in
+        // 2. Load DNS Settings Manager status
+        dnsSettingsManager.loadFromPreferences { [weak self] error in
             DispatchQueue.main.async {
-                self?.isProxyInstalled = self?.dnsProxyManager.isEnabled ?? false
+                let settingsEnabled = self?.dnsSettingsManager.isEnabled ?? false
+                if settingsEnabled {
+                    self?.isEnabled = true
+                    self?.statusMessage = "Đang áp dụng bộ lọc DNS VIP"
+                }
             }
         }
     }
 
-    public func toggleConnection() {
+    public func toggleProtection() {
         if isEnabled || isProxyInstalled {
-            disableAllDNS()
+            disableAllProtection()
         } else {
-            enableAllDNS()
+            enableAllProtection()
         }
     }
 
-    public func enableAllDNS() {
-        let cleanID = nextDnsID.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sanitizedDeviceName = deviceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "iPhone"
+    // Auto-request VPN & DNS permission like NextDNS without any codes!
+    public func enableAllProtection(completion: ((Bool) -> Void)? = nil) {
+        statusMessage = "Đang yêu cầu cấp quyền hệ thống..."
+        errorMessage = nil
 
-        // 1. Enable NEDNSProxyManager (Appears as DNS Proxy in Settings with App Icon)
+        // Step 1: Configure & Save NEDNSProxyManager -> Appears in iOS Settings > DNS with App Icon!
         dnsProxyManager.loadFromPreferences { [weak self] error in
             guard let self = self else { return }
             
-            let protocolConfig = NEDNSProxyProviderProtocol()
-            protocolConfig.providerBundleIdentifier = "com.nextdns.custom.dnsproxy"
-            protocolConfig.providerConfiguration = [
-                "profileID": cleanID,
-                "protocol": self.selectedProtocol.rawValue
-            ]
-            self.dnsProxyManager.providerProtocol = protocolConfig
-            self.dnsProxyManager.localizedDescription = cleanID.isEmpty ? "NextDNS VIP (Chặn Game)" : "NextDNS (\(cleanID))"
+            let proto = NEDNSProxyProviderProtocol()
+            proto.providerBundleIdentifier = "com.nextdns.custom.dnsproxy"
+            
+            self.dnsProxyManager.providerProtocol = proto
+            self.dnsProxyManager.localizedDescription = "DNS VIP"
             self.dnsProxyManager.isEnabled = true
 
             self.dnsProxyManager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
                     if let saveError = saveError {
-                        NSLog("[DNSManager] Proxy save error: %@", saveError.localizedDescription)
+                        NSLog("[DNSManager] DNS Proxy save error: %@", saveError.localizedDescription)
+                        self?.errorMessage = "Chưa cấp quyền: \(saveError.localizedDescription)"
                     } else {
                         self?.isProxyInstalled = true
-                        NSLog("[DNSManager] DNS Proxy installed into iOS Settings successfully!")
+                        self?.isEnabled = true
+                        self?.statusMessage = "Đang bảo vệ • Đã kích hoạt DNS VIP"
+                        NSLog("[DNSManager] DNS VIP Proxy installed into iOS Settings successfully!")
                     }
                 }
             }
         }
 
-        // 2. Enable NEDNSSettingsManager (DoH/DoT System Profile)
+        // Step 2: Configure System-wide DoH Resolver (Cloudflare / Quad9 / NextDNS Public)
         dnsSettingsManager.loadFromPreferences { [weak self] error in
             guard let self = self else { return }
-            if let error = error {
-                DispatchQueue.main.async {
-                    self.errorMessage = "Không thể tải cấu hình: \(error.localizedDescription)"
-                }
-                return
-            }
 
-            switch self.selectedProtocol {
-            case .doh:
-                let doh = NEDNSOverHTTPSSettings(servers: ["45.90.28.0", "45.90.30.0"])
-                let urlString: String
-                if cleanID.isEmpty {
-                    urlString = "https://dns.nextdns.io"
-                } else {
-                    urlString = "https://dns.nextdns.io/\(cleanID)/\(sanitizedDeviceName)"
-                }
-                doh.serverURL = URL(string: urlString)
-                self.dnsSettingsManager.dnsSettings = doh
+            let doh = NEDNSOverHTTPSSettings(servers: ["1.1.1.1", "1.0.0.1", "2606:4700:4700::1111"])
+            doh.serverURL = URL(string: "https://cloudflare-dns.com/dns-query")
 
-            case .dot:
-                let dot = NEDNSOverTLSSettings(servers: ["45.90.28.0", "45.90.30.0"])
-                if cleanID.isEmpty {
-                    dot.serverName = "anycast.dns.nextdns.io"
-                } else {
-                    dot.serverName = "\(cleanID).dns.nextdns.io"
-                }
-                self.dnsSettingsManager.dnsSettings = dot
-            }
-
-            self.dnsSettingsManager.localizedDescription = cleanID.isEmpty ? "NextDNS VIP" : "NextDNS (\(cleanID))"
+            self.dnsSettingsManager.dnsSettings = doh
+            self.dnsSettingsManager.localizedDescription = "DNS VIP"
 
             self.dnsSettingsManager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
                     if let saveError = saveError {
-                        self?.errorMessage = "Lỗi lưu cấu hình: \(saveError.localizedDescription)"
+                        NSLog("[DNSManager] Settings error: %@", saveError.localizedDescription)
                     } else {
                         self?.isEnabled = true
-                        self?.errorMessage = nil
-                        self?.checkLiveConnection()
+                        self?.statusMessage = "Đang bảo vệ • Đã kích hoạt DNS VIP"
+                        completion?(true)
                     }
                 }
             }
         }
     }
 
-    public func disableAllDNS() {
-        // Disable Proxy
+    public func disableAllProtection() {
+        statusMessage = "Đang tắt..."
+        
         dnsProxyManager.loadFromPreferences { [weak self] _ in
             self?.dnsProxyManager.removeFromPreferences { _ in
                 DispatchQueue.main.async {
@@ -175,47 +118,14 @@ public class DNSManager: ObservableObject {
             }
         }
 
-        // Disable Settings
         dnsSettingsManager.loadFromPreferences { [weak self] _ in
             self?.dnsSettingsManager.removeFromPreferences { _ in
                 DispatchQueue.main.async {
                     self?.isEnabled = false
-                    self?.liveStatusText = "Đã tắt bảo vệ DNS"
-                    self?.isConnectedToNextDNS = false
+                    self?.statusMessage = "Chưa kích hoạt"
                 }
             }
         }
-    }
-
-    public func checkLiveConnection() {
-        isVerifying = true
-        guard let url = URL(string: "https://test.nextdns.io") else {
-            isVerifying = false
-            return
-        }
-
-        var req = URLRequest(url: url)
-        req.timeoutInterval = 4.0
-        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
-            DispatchQueue.main.async {
-                self?.isVerifying = false
-                guard let data = data,
-                      let res = try? JSONDecoder().decode(NextDNSTestStatus.self, from: data) else {
-                    self?.liveStatusText = "Đang áp dụng bộ lọc cục bộ & mã hóa"
-                    self?.isConnectedToNextDNS = true
-                    return
-                }
-
-                if res.status == "ok" {
-                    self?.isConnectedToNextDNS = true
-                    let proto = res.protocol ?? "DoH"
-                    self?.liveStatusText = "Đã kết nối an toàn qua \(proto)"
-                } else {
-                    self?.isConnectedToNextDNS = false
-                    self?.liveStatusText = "Đang áp dụng bộ lọc cục bộ"
-                }
-            }
-        }.resume()
     }
 
     public func openSystemSettings() {

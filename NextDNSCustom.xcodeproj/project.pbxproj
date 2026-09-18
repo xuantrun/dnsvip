@@ -354,14 +354,14 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NextDNSCustom/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = NextDNS;
+				INFOPLIST_KEY_CFBundleDisplayName = "DNS VIP";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nextdns.custom;
-				PRODUCT_NAME = NextDNS;
+				PRODUCT_NAME = "DNS VIP";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -378,14 +378,14 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = NextDNSCustom/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = NextDNS;
+				INFOPLIST_KEY_CFBundleDisplayName = "DNS VIP";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 2.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.nextdns.custom;
-				PRODUCT_NAME = NextDNS;
+				PRODUCT_NAME = "DNS VIP";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

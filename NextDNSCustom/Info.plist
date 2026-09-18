@@ -11,7 +11,9 @@
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>NextDNS</string>
+    <string>DNS VIP</string>
+    <key>CFBundleDisplayName</key>
+    <string>DNS VIP</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>

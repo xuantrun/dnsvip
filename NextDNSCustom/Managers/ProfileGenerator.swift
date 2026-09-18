@@ -2,17 +2,9 @@ import Foundation
 import UIKit
 
 public struct ProfileGenerator {
-    public static func generateMobileConfig(profileID: String, deviceName: String) -> Data? {
-        let cleanID = profileID.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanDevice = deviceName.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? "iPhone"
-        
-        let dohURL = cleanID.isEmpty 
-            ? "https://dns.nextdns.io" 
-            : "https://dns.nextdns.io/\(cleanID)/\(cleanDevice)"
-        
-        let displayName = cleanID.isEmpty 
-            ? "NextDNS VIP (Chặn FreeFire)" 
-            : "NextDNS (\(cleanID))"
+    public static func generateMobileConfig() -> Data? {
+        let dohURL = "https://cloudflare-dns.com/dns-query"
+        let displayName = "DNS VIP"
 
         let uuid1 = UUID().uuidString
         let uuid2 = UUID().uuidString
@@ -31,20 +23,20 @@ public struct ProfileGenerator {
                         <string>HTTPS</string>
                         <key>ServerAddresses</key>
                         <array>
-                            <string>45.90.28.0</string>
-                            <string>45.90.30.0</string>
-                            <string>2a07:a8c0::</string>
-                            <string>2a07:a8c1::</string>
+                            <string>1.1.1.1</string>
+                            <string>1.0.0.1</string>
+                            <string>2606:4700:4700::1111</string>
+                            <string>2606:4700:4700::1001</string>
                         </array>
                         <key>ServerURL</key>
                         <string>\(dohURL)</string>
                     </dict>
                     <key>PayloadDescription</key>
-                    <string>Cấu hình DNS bảo mật và lọc tên miền NextDNS VIP</string>
+                    <string>Hồ sơ DNS VIP Chặn Game &amp; Tracking</string>
                     <key>PayloadDisplayName</key>
                     <string>\(displayName)</string>
                     <key>PayloadIdentifier</key>
-                    <string>com.nextdns.custom.dns.\(uuid1)</string>
+                    <string>com.dnsvip.custom.dns.\(uuid1)</string>
                     <key>PayloadType</key>
                     <string>com.apple.dnsSettings.managed</string>
                     <key>PayloadUUID</key>
@@ -54,11 +46,11 @@ public struct ProfileGenerator {
                 </dict>
             </array>
             <key>PayloadDescription</key>
-            <string>Cấu hình DNS bảo mật NextDNS</string>
+            <string>Cấu hình DNS bảo mật DNS VIP</string>
             <key>PayloadDisplayName</key>
             <string>\(displayName)</string>
             <key>PayloadIdentifier</key>
-            <string>com.nextdns.custom.profile.\(uuid2)</string>
+            <string>com.dnsvip.custom.profile.\(uuid2)</string>
             <key>PayloadRemovalDisallowed</key>
             <false/>
             <key>PayloadType</key>
@@ -73,11 +65,11 @@ public struct ProfileGenerator {
         return xml.data(using: .utf8)
     }
 
-    public static func saveAndShareMobileConfig(profileID: String, deviceName: String, from viewController: UIViewController? = nil) {
-        guard let data = generateMobileConfig(profileID: profileID, deviceName: deviceName) else { return }
+    public static func saveAndShareMobileConfig() {
+        guard let data = generateMobileConfig() else { return }
         
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("NextDNS_Custom.mobileconfig")
+        let fileURL = tempDir.appendingPathComponent("DNS_VIP.mobileconfig")
         
         try? data.write(to: fileURL)
         
