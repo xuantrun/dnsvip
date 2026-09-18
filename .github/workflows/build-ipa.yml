@@ -1,0 +1,66 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Display Xcode Version
+        run: |
+          xcodebuild -version
+
+      - name: Build Xcode Archive
+        run: |
+          xcodebuild clean archive \
+            -project NextDNSCustom.xcodeproj \
+            -scheme NextDNSCustom \
+            -configuration Release \
+            -archivePath build/NextDNSCustom.xcarchive \
+            -destination "generic/platform=iOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package IPA
+        run: |
+          mkdir -p build/Payload
+          cp -r build/NextDNSCustom.xcarchive/Products/Applications/NextDNS.app build/Payload/
+          cd build
+          zip -qry NextDNS-Custom-Blocked.ipa Payload
+          ls -la NextDNS-Custom-Blocked.ipa
+          cd ..
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NextDNS-Custom-Blocked-IPA
+          path: build/NextDNS-Custom-Blocked.ipa
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.0
+          name: "NextDNS Custom Blocked v2.0.0"
+          body: |
+            ## 🚀 NextDNS Custom iOS App
+            - Tích hợp đầy đủ tính năng DNS-over-HTTPS (DoH) và DNS-over-TLS (DoT) giống AppStore.
+            - Yêu cầu cấp quyền cấu hình DNS hệ thống (System DNS Settings).
+            - Tích hợp sẵn danh sách chặn Domain và Wildcard theo yêu cầu.
+            - Hỗ trợ cài đặt qua TrollStore, AltStore, Sideloadly.
+          files: build/NextDNS-Custom-Blocked.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
