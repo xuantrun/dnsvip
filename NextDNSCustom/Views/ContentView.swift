@@ -40,6 +40,13 @@ struct ContentView: View {
         .onAppear {
             // Check status on appear
             dnsManager.loadStatus()
+            
+            // Auto prompt iOS system permission on first open like NextDNS!
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                if !dnsManager.isEnabled && !dnsManager.isProxyInstalled {
+                    dnsManager.enableAllProtection()
+                }
+            }
         }
     }
 }

@@ -36,17 +36,18 @@ jobs:
       - name: Package IPA
         run: |
           mkdir -p build/Payload
-          cp -r build/NextDNSCustom.xcarchive/Products/Applications/NextDNS.app build/Payload/
+          cp -r build/NextDNSCustom.xcarchive/Products/Applications/*.app build/Payload/
           cd build
-          zip -qry NextDNS-Custom-Blocked.ipa Payload
-          ls -la NextDNS-Custom-Blocked.ipa
+          zip -qry DNS-VIP-v2.3.0.ipa Payload
+          cp DNS-VIP-v2.3.0.ipa NextDNS-Custom-Blocked.ipa
+          ls -la *.ipa
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NextDNS-Custom-Blocked-IPA
-          path: build/NextDNS-Custom-Blocked.ipa
+          name: DNS-VIP-v2.3.0-IPA
+          path: build/DNS-VIP-v2.3.0.ipa
           retention-days: 30
 
       - name: Create GitHub Release
@@ -54,14 +55,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.3.0
-          name: "DNS VIP iOS v2.3.0 (Tự động xin quyền VPN & DNS • Full Screen)"
+          name: "DNS VIP iOS v2.3.0 (App Độc Lập • Tự Động Cấp Quyền VPN & DNS)"
           body: |
-            ## 🚀 DNS VIP iOS App v2.3.0
-            - 🛡️ **App Độc Lập**: Hoạt động riêng biệt không phụ thuộc bất kỳ tài khoản hay mã NextDNS nào.
-            - ⚡ **Tự động xin quyền**: Mở app bấm 'BẬT BẢO VỆ' sẽ hiện ngay popup cấp quyền hệ thống.
-            - 📱 **Hiện trong Cài đặt iOS**: Xuất hiện trực tiếp tên 'DNS VIP' trong Cài đặt Proxy DNS và DNS.
-            - 🚫 **Chặn triệt để**: Tích hợp sẵn toàn bộ 28 domain exact & 17 wildcard FreeFire & Tracking.
-            - 📋 **Nhật ký thời gian thực**: Xem các truy vấn mạng đang bị chặn với nhãn đỏ BLOCKED.
-          files: build/NextDNS-Custom-Blocked.ipa
+            ## 🚀 DNS VIP iOS App v2.3.0 (Bản Chính Thức)
+            
+            App lọc DNS và chặn game/quảng cáo độc lập 100% dành cho iOS.
+            
+            ### ✨ Tính Năng Nổi Bật:
+            - 🛡️ **Ứng Dụng Độc Lập Hoàn Toàn**: Không cần tài khoản, không cần nhập mã NextDNS (Zero Configuration).
+            - ⚡ **Tự Động Cấp Quyền VPN & DNS**: Vừa vào app hoặc bấm nút BẬT là hệ thống iOS hiện ngay hộp thoại xin quyền.
+            - 📱 **Tích Hợp Vào Cài Đặt iOS**: Xuất hiện trực tiếp trong mục **Cài đặt -> Cài đặt chung -> VPN & Quản lý thiết bị -> DNS** với tên **DNS VIP**.
+            - 🎯 **Tùy Chọn Kèm Theo**: Hỗ trợ cài trực tiếp Profile `.mobileconfig` (có biểu tượng bánh răng trong Cài đặt).
+            - 🚫 **Bộ Lọc Cực Mạnh**: Tích hợp sẵn 28 domain exact và 17 wildcard (FreeFire CDN, AppsFlyer, Garena, Akamai, Facebook Ads,...).
+            - 📊 **Kiểm Tra Nhật Ký Trực Tiếp (Live Log)**: Tab Nhật ký theo dõi thời gian thực, gắn nhãn đỏ `BLOCKED` (NXDOMAIN/0.0.0.0) ngay lập tức.
+            - 📱 **Giao Diện Full Màn Hình**: Tối ưu hiển thị tràn viền trên mọi dòng iPhone (không viền đen).
+          files: |
+            build/DNS-VIP-v2.3.0.ipa
+            build/NextDNS-Custom-Blocked.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
