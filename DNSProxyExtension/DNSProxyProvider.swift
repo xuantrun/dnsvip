@@ -1,28 +1,31 @@
 import Foundation
 import NetworkExtension
+import Network
 
 public class DNSProxyProvider: NEPacketTunnelProvider {
 
     private var inMemoryLogs: [DNSQueryLogItem] = []
-    private let maxInMemoryLogs = 250
-    private let upstreamDoHURL = URL(string: "https://cloudflare-dns.com/dns-query")!
-    private let dohSession = URLSession(configuration: .ephemeral)
+    private let maxInMemoryLogs = 300
+    private let virtualInterfaceIP = "198.18.0.1"
+    private let virtualDNSServerIP = "198.18.0.2"
 
     public override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         NSLog("[DNS VIP] Packet Tunnel starting...")
 
-        // Virtual tunnel settings routing DNS queries to virtual IP 198.18.0.1
         let tunnelSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: "127.0.0.1")
 
-        // 1. IPv4 Route: Intercept traffic destined for the virtual DNS address
-        let ipv4Settings = NEIPv4Settings(addresses: ["198.18.0.1"], subnetMasks: ["255.255.255.0"])
+        // 1. Virtual Tunnel Interface (Client IP: 198.18.0.1)
+        let ipv4Settings = NEIPv4Settings(addresses: [virtualInterfaceIP], subnetMasks: ["255.255.255.0"])
+        
+        // 2. Included Routes: Route virtual DNS server IP (198.18.0.2) into the tunnel
+        // Crucial: 198.18.0.2 is DIFFERENT from interface IP 198.18.0.1 so the iOS kernel routes packets across TUN!
         ipv4Settings.includedRoutes = [
-            NEIPv4Route(destinationAddress: "198.18.0.1", subnetMask: "255.255.255.255")
+            NEIPv4Route(destinationAddress: virtualDNSServerIP, subnetMask: "255.255.255.255")
         ]
         tunnelSettings.ipv4Settings = ipv4Settings
 
-        // 2. DNS Settings: System-wide DNS routing directing queries to 198.18.0.1
-        let dnsSettings = NEDNSSettings(servers: ["198.18.0.1"])
+        // 3. System-wide DNS Settings directing ALL domains to our virtual DNS resolver 198.18.0.2
+        let dnsSettings = NEDNSSettings(servers: [virtualDNSServerIP])
         dnsSettings.matchDomains = [""] // Intercept all DNS traffic
         tunnelSettings.dnsSettings = dnsSettings
 
@@ -33,7 +36,7 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
                 NSLog("[DNS VIP] Failed to set tunnel network settings: %@", error.localizedDescription)
                 completionHandler(error)
             } else {
-                NSLog("[DNS VIP] Packet Tunnel started successfully! iOS [VPN] icon active.")
+                NSLog("[DNS VIP] Packet Tunnel active! iOS [VPN] icon ON. Listening for DNS on %@", self?.virtualDNSServerIP ?? "")
                 completionHandler(nil)
                 self?.startReadingPackets()
             }
@@ -53,7 +56,7 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
         NSLog("[DNS VIP] Packet Tunnel woke up.")
     }
 
-    // MARK: - IPC Communication with Main App (No App Groups Required)
+    // MARK: - IPC Communication with Main App (Zero App Group Dependency)
     public override func handleAppMessage(_ messageData: Data, completionHandler: ((Data?) -> Void)?) {
         guard let command = String(data: messageData, encoding: .utf8) else {
             completionHandler?(nil)
@@ -71,7 +74,7 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
         }
     }
 
-    // MARK: - Packet Interception & DNS Routing
+    // MARK: - Read & Filter Packets
     private func startReadingPackets() {
         packetFlow.readPackets { [weak self] packets, protocols in
             guard let self = self else { return }
@@ -85,22 +88,20 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
     private func processPacket(_ packet: Data, protocolFamily: NSNumber) {
         guard packet.count >= 28 else { return }
 
-        // Verify IPv4
-        let version = packet[0] >> 4
-        guard version == 4 else { return }
+        // Must be IPv4
+        guard (packet[0] >> 4) == 4 else { return }
 
         let ipHeaderLen = Int(packet[0] & 0x0F) * 4
         guard packet.count >= ipHeaderLen + 8 else { return }
 
-        // Verify UDP (protocol 17)
-        let proto = packet[9]
-        guard proto == 17 else { return }
+        // Must be UDP (protocol 17)
+        guard packet[9] == 17 else { return }
 
-        // UDP Header
+        // Destination port must be 53 (DNS)
         let dstPort = (UInt16(packet[ipHeaderLen + 2]) << 8) | UInt16(packet[ipHeaderLen + 3])
-        guard dstPort == 53 else { return } // Standard DNS port
+        guard dstPort == 53 else { return }
 
-        // Extract DNS Payload
+        // Extract raw DNS Payload
         let dnsPayload = packet.subdata(in: (ipHeaderLen + 8)..<packet.count)
         guard dnsPayload.count >= 12 else { return }
 
@@ -111,13 +112,14 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
         recordLog(domain: domain, isBlocked: isBlocked)
 
         if isBlocked {
-            // Synthetic instant NXDOMAIN response (0ms block)
-            if let responsePacket = makeBlockedDNSResponse(forPacket: packet, ipHeaderLen: ipHeaderLen, dnsPayload: dnsPayload) {
+            // Instant 0ms Sinkhole Block (0.0.0.0 Answer)
+            if let responsePacket = makeSinkholeBlockedResponse(forPacket: packet, ipHeaderLen: ipHeaderLen, dnsPayload: dnsPayload) {
                 packetFlow.writePackets([responsePacket], withProtocols: [protocolFamily])
+                NSLog("[DNS VIP] >>> BLOCKED: %@ -> 0.0.0.0", domain)
             }
         } else {
-            // Forward query to Cloudflare DoH (RFC 8484)
-            forwardDoHQuery(dnsPayload: dnsPayload) { [weak self] answerData in
+            // Forward allowed query to upstream DNS (1.1.1.1:53)
+            forwardUpstreamDNS(dnsPayload: dnsPayload) { [weak self] answerData in
                 guard let self = self, let answerData = answerData else { return }
                 if let responsePacket = self.makeDNSResponsePacket(forPacket: packet, ipHeaderLen: ipHeaderLen, answerPayload: answerData) {
                     self.packetFlow.writePackets([responsePacket], withProtocols: [protocolFamily])
@@ -132,89 +134,134 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
             isBlocked: isBlocked,
             timestamp: Date(),
             queryType: "A",
-            clientProtocol: "DoH/VPN"
+            clientProtocol: "VPN"
         )
         inMemoryLogs.insert(item, at: 0)
         if inMemoryLogs.count > maxInMemoryLogs {
             inMemoryLogs = Array(inMemoryLogs.prefix(maxInMemoryLogs))
         }
 
-        // Also persist to shared manager
-        QueryLogManager.appendLog(domain: domain, isBlocked: isBlocked, queryType: "A", clientProtocol: "DoH/VPN")
+        QueryLogManager.appendLog(domain: domain, isBlocked: isBlocked, queryType: "A", clientProtocol: "VPN")
     }
 
-    // MARK: - Forwarding via Cloudflare DoH
-    private func forwardDoHQuery(dnsPayload: Data, completion: @escaping (Data?) -> Void) {
-        var request = URLRequest(url: upstreamDoHURL)
-        request.httpMethod = "POST"
-        request.setValue("application/dns-message", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/dns-message", forHTTPHeaderField: "Accept")
-        request.httpBody = dnsPayload
-        request.timeoutInterval = 3.0
+    // MARK: - Upstream Forwarding via UDP 1.1.1.1:53
+    private func forwardUpstreamDNS(dnsPayload: Data, completion: @escaping (Data?) -> Void) {
+        let host = NWEndpoint.Host("1.1.1.1")
+        let port = NWEndpoint.Port(rawValue: 53)!
+        let connection = NWConnection(host: host, port: port, using: .udp)
 
-        let task = dohSession.dataTask(with: request) { data, response, error in
-            if let httpResp = response as? HTTPURLResponse, httpResp.statusCode == 200, let data = data {
-                completion(data)
-            } else {
-                completion(nil)
+        var hasFinished = false
+        func finish(data: Data?) {
+            guard !hasFinished else { return }
+            hasFinished = true
+            connection.cancel()
+            completion(data)
+        }
+
+        connection.stateUpdateHandler = { state in
+            if case .ready = state {
+                connection.send(content: dnsPayload, completion: .contentProcessed({ sendError in
+                    if sendError != nil {
+                        finish(data: nil)
+                        return
+                    }
+                    connection.receive(minimumIncompleteLength: 12, maximumLength: 4096) { recvData, _, _, _ in
+                        finish(data: recvData)
+                    }
+                }))
+            } else if case .failed(_) = state {
+                finish(data: nil)
             }
         }
-        task.resume()
+
+        // 1.5s timeout safety
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+            finish(data: nil)
+        }
+
+        connection.start(queue: .global())
     }
 
-    // MARK: - Constructing Synthetic NXDOMAIN Response
-    private func makeBlockedDNSResponse(forPacket packet: Data, ipHeaderLen: Int, dnsPayload: Data) -> Data? {
+    // MARK: - Construct Sinkhole Block Response (0.0.0.0 Answer)
+    private func makeSinkholeBlockedResponse(forPacket packet: Data, ipHeaderLen: Int, dnsPayload: Data) -> Data? {
         var respDNS = dnsPayload
-        // Header flags: 0x8183 = Response + Recursion Desired + Recursion Available + NXDOMAIN
+
+        // Flags: 0x8180 = Response, Standard Query, No Error
         respDNS[2] = 0x81
-        respDNS[3] = 0x83
+        respDNS[3] = 0x80
+
+        // Answer Count = 1 (ANCOUNT = 1)
+        respDNS[6] = 0x00
+        respDNS[7] = 0x01
+
+        // Authority Count = 0
+        respDNS[8] = 0x00
+        respDNS[9] = 0x00
+
+        // Additional Count = 0
+        respDNS[10] = 0x00
+        respDNS[11] = 0x00
+
+        // 16-byte A Answer Record: Name pointer 0xC00C, Type A (1), Class IN (1), TTL 60s, Len 4, IP 0.0.0.0
+        let answerRecord = Data([
+            0xc0, 0x0c,             // Name pointer -> offset 12 (QNAME)
+            0x00, 0x01,             // Type: A
+            0x00, 0x01,             // Class: IN
+            0x00, 0x00, 0x00, 0x3c, // TTL: 60 seconds
+            0x00, 0x04,             // Data length: 4 bytes
+            0x00, 0x00, 0x00, 0x00  // IP Address: 0.0.0.0 (Sinkhole blocked!)
+        ])
+        respDNS.append(answerRecord)
 
         return makeDNSResponsePacket(forPacket: packet, ipHeaderLen: ipHeaderLen, answerPayload: respDNS)
     }
 
-    // MARK: - IP/UDP Packet Builder
+    // MARK: - Construct Returning IPv4/UDP Packet
     private func makeDNSResponsePacket(forPacket queryPacket: Data, ipHeaderLen: Int, answerPayload: Data) -> Data? {
         let totalLen = ipHeaderLen + 8 + answerPayload.count
         var respPacket = Data(count: totalLen)
 
-        // 1. Copy IP header from original query
+        // Copy IP Header
         respPacket.replaceSubrange(0..<ipHeaderLen, with: queryPacket.subdata(in: 0..<ipHeaderLen))
 
-        // Swap IP source and destination (answer goes back to client)
+        // Swap IP Source and Destination
         for i in 0..<4 {
             let src = queryPacket[12 + i]
             let dst = queryPacket[16 + i]
-            respPacket[12 + i] = dst // new source is DNS server
-            respPacket[16 + i] = src // new dest is client
+            respPacket[12 + i] = dst // Source is now 198.18.0.2 (DNS Server)
+            respPacket[16 + i] = src // Destination is client
         }
 
-        // Update IP total length
+        // Update IP Length
         respPacket[2] = UInt8((totalLen >> 8) & 0xFF)
         respPacket[3] = UInt8(totalLen & 0xFF)
 
-        // 2. UDP Header
+        // UDP Header
         let udpOffset = ipHeaderLen
         let clientPort0 = queryPacket[ipHeaderLen]
         let clientPort1 = queryPacket[ipHeaderLen + 1]
 
-        // Source port = 53 (DNS)
+        // Source Port = 53
         respPacket[udpOffset] = 0x00
         respPacket[udpOffset + 1] = 0x35
-        // Dest port = client port
+
+        // Dest Port = Client Port
         respPacket[udpOffset + 2] = clientPort0
         respPacket[udpOffset + 3] = clientPort1
 
+        // UDP Length
         let udpLen = 8 + answerPayload.count
         respPacket[udpOffset + 4] = UInt8((udpLen >> 8) & 0xFF)
         respPacket[udpOffset + 5] = UInt8(udpLen & 0xFF)
-        // UDP checksum (0 is valid for IPv4)
+
+        // UDP Checksum = 0
         respPacket[udpOffset + 6] = 0x00
         respPacket[udpOffset + 7] = 0x00
 
-        // 3. Append DNS Payload
+        // DNS Payload
         respPacket.replaceSubrange((ipHeaderLen + 8)..<totalLen, with: answerPayload)
 
-        // Recalculate IP Checksum
+        // Recalculate IPv4 Checksum
         respPacket[10] = 0x00
         respPacket[11] = 0x00
         var checksum: UInt32 = 0

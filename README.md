@@ -1,30 +1,24 @@
 # 🚀 DNS VIP iOS (Tự động cấp quyền VPN & DNS • Chặn FreeFire)
 
-[![Download IPA](https://img.shields.io/badge/Download-DNS--VIP--v2.3.3.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.3.3/DNS-VIP-v2.3.3.ipa)
+[![Download IPA](https://img.shields.io/badge/Download-DNS--VIP--v2.3.4.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.3.4/DNS-VIP-v2.3.4.ipa)
 [![Release](https://img.shields.io/github/v/release/xuantrun/dnsvip?style=for-the-badge)](https://github.com/xuantrun/dnsvip/releases/latest)
 
-> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.3.3 - Giao diện NextDNS • Fix Nhật Ký • [VPN]):**  
-> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI DNS-VIP-v2.3.3.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.3/DNS-VIP-v2.3.3.ipa)**  
-> 👉 **[Link phụ: NextDNS-Custom-Blocked.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.3/NextDNS-Custom-Blocked.ipa)**  
+> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.3.4 - Fix Chặn 0.0.0.0 Sinkhole & Nhật Ký Trực Tiếp):**  
+> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI DNS-VIP-v2.3.4.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.4/DNS-VIP-v2.3.4.ipa)**  
+> 👉 **[Link phụ: NextDNS-Custom-Blocked.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.4/NextDNS-Custom-Blocked.ipa)**  
 > *(Hoặc xem tất cả phiên bản tại mục: [GitHub Releases](https://github.com/xuantrun/dnsvip/releases))*
 
 ---
 
-## 🎯 Điểm nổi bật của phiên bản này:
+## 🎯 Điểm nổi bật của bản cập nhật v2.3.4:
 
-1. **Ứng dụng Độc Lập Hoàn Toàn**: Không phải app NextDNS, không bắt nhập bất kỳ mã ID cấu hình hay tài khoản nào. Mọi thứ đã được thiết lập sẵn từ A-Z.
-2. **Tự động xin quyền Hệ thống**: Vừa mở app bấm **BẬT BẢO VỆ**, iOS sẽ hiện ngay popup cấp quyền hệ thống:  
-   *`"DNS VIP" Would Like to Add DNS Proxy Configurations...`*
-3. **Hiển thị trực tiếp trong Cài đặt iOS**:  
-   Sau khi cấp quyền, ứng dụng sẽ xuất hiện với tên **`DNS VIP`** trong mục **Cài đặt -> Cài đặt chung -> VPN & Quản lý thiết bị -> DNS (Cài đặt Proxy DNS và DNS)**.
-4. **Hỗ trợ thêm Profile (.mobileconfig)**: Nếu muốn có thêm dòng icon bánh răng trong Cài đặt DNS, chỉ cần bấm nút *"Thêm Profile 'DNS VIP' vào máy"* ngay trên app.
-5. **Chặn sạch sẽ 28 domain exact & 17 wildcard** FreeFire, Garena, AppsFlyer, Akamai.
-6. **Nhật ký truy vấn trực tiếp (Logs)**: Theo dõi thời gian thực các tên miền bị khóa với nhãn đỏ **`BLOCKED`**.
+1. **Cơ chế Sinkhole Chặn 0.0.0.0 Cực Mạnh**: Khi Free Fire truy vấn các domain `dl.aw.freefiremobile.com`, `version.ffmax`, hệ thống sẽ lập tức trả về IP `0.0.0.0` ngay trong máy, khiến Game không thể kết nối server và bị chặn hoàn toàn.
+2. **Tách biệt định tuyến DNS 198.18.0.2**: Đảm bảo toàn bộ gói tin DNS của tất cả ứng dụng & Game đều đi qua bộ lọc Packet Tunnel mà không bị kẹt hay bypass.
+3. **Nhật ký thời gian thực (Live Logs)**: Ghi nhận trực tiếp từng truy vấn bị chặn với nhãn đỏ **`CHẶN`** và nhãn xanh **`CHO PHÉP`**.
+4. **Giao diện NextDNS Hero**: Thiết kế công tắc nguồn to bản, màn hình thống kê trực quan.
 
 ---
 
-## 📲 Cài đặt lên iPhone
-
-- Tải file `.ipa` theo link ở trên.
-- Cài qua **TrollStore**, **AltStore**, **SideStore** hoặc **Sideloadly**.
-- Mở app **DNS VIP** -> Bấm nút **BẬT BẢO VỆ & CHẶN NGAY** -> Chọn **Allow (Cho phép)**.
+## ⚠️ LƯU Ý KHI TEST BỘ LỌC CHẶN GAME:
+- Vì iOS có bộ nhớ đệm DNS (**DNS Cache**): Nếu bạn vừa mở Game trước khi bật VPN, iPhone vẫn còn lưu IP cũ của game trong RAM.
+- 👉 **Cách test chuẩn**: Bật VPN trên App -> Vuốt tắt hẳn Game (hoặc bật/tắt Chế độ máy bay 2 giây) -> Mở lại Game để iPhone gửi truy vấn DNS mới -> Game sẽ bị chặn ngay lập tức và Nhật ký trong app sẽ nhảy thông báo!
