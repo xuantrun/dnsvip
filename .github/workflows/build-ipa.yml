@@ -38,26 +38,26 @@ jobs:
           mkdir -p build/Payload
           cp -r build/NextDNSCustom.xcarchive/Products/Applications/*.app build/Payload/
           cd build
-          zip -qry DNS-VIP-v2.3.0.ipa Payload
-          cp DNS-VIP-v2.3.0.ipa NextDNS-Custom-Blocked.ipa
+          zip -qry DNS-VIP-v2.3.1.ipa Payload
+          cp DNS-VIP-v2.3.1.ipa NextDNS-Custom-Blocked.ipa
           ls -la *.ipa
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DNS-VIP-v2.3.0-IPA
-          path: build/DNS-VIP-v2.3.0.ipa
+          name: DNS-VIP-v2.3.1-IPA
+          path: build/DNS-VIP-v2.3.1.ipa
           retention-days: 30
 
       - name: Create GitHub Release
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.3.0
-          name: "DNS VIP iOS v2.3.0 (App Độc Lập • Tự Động Cấp Quyền VPN & DNS)"
+          tag_name: v2.3.1
+          name: "DNS VIP iOS v2.3.1 (Tự Động Cấp Quyền Hệ Thống • Icon App Trong Cài Đặt)"
           body: |
-            ## 🚀 DNS VIP iOS App v2.3.0 (Bản Chính Thức)
+            ## 🚀 DNS VIP iOS App v2.3.1 (Fix Quyền Thiết Bị)
             
             App lọc DNS và chặn game/quảng cáo độc lập 100% dành cho iOS.
             

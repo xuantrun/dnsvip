@@ -12,33 +12,40 @@ public class DNSManager: ObservableObject {
     @Published public var statusMessage: String = "Sẵn sàng bảo vệ"
     @Published public var upstreamServer: String = "Cloudflare DoH (1.1.1.1)"
     @Published public var errorMessage: String? = nil
+    @Published public var isLoading: Bool = false
 
-    private let dnsProxyManager = NEDNSProxyManager.shared()
     private let dnsSettingsManager = NEDNSSettingsManager.shared()
+    private var tunnelManager: NETunnelProviderManager?
 
     private init() {
         loadStatus()
     }
 
     public func loadStatus() {
-        // 1. Load DNS Proxy Manager status
-        dnsProxyManager.loadFromPreferences { [weak self] error in
+        // 1. Check NEDNSSettingsManager (Settings > DNS entry with App Icon)
+        dnsSettingsManager.loadFromPreferences { [weak self] _ in
             DispatchQueue.main.async {
-                self?.isProxyInstalled = self?.dnsProxyManager.isEnabled ?? false
-                if self?.isProxyInstalled == true {
+                let isDnsActive = self?.dnsSettingsManager.isEnabled ?? false
+                if isDnsActive {
                     self?.isEnabled = true
-                    self?.statusMessage = "Đang kích hoạt Proxy DNS & Chặn Game"
+                    self?.isProxyInstalled = true
+                    self?.statusMessage = "Đang bảo vệ • DNS VIP đã kích hoạt"
+                    self?.errorMessage = nil
                 }
             }
         }
 
-        // 2. Load DNS Settings Manager status
-        dnsSettingsManager.loadFromPreferences { [weak self] error in
+        // 2. Check NETunnelProviderManager (VPN Configurations)
+        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, _ in
             DispatchQueue.main.async {
-                let settingsEnabled = self?.dnsSettingsManager.isEnabled ?? false
-                if settingsEnabled {
-                    self?.isEnabled = true
-                    self?.statusMessage = "Đang áp dụng bộ lọc DNS VIP"
+                if let mgr = managers?.first {
+                    self?.tunnelManager = mgr
+                    if mgr.isEnabled {
+                        self?.isEnabled = true
+                        self?.isProxyInstalled = true
+                        self?.statusMessage = "Đang bảo vệ • VPN DNS VIP đang hoạt động"
+                        self?.errorMessage = nil
+                    }
                 }
             }
         }
@@ -54,37 +61,13 @@ public class DNSManager: ObservableObject {
 
     // Auto-request VPN & DNS permission like NextDNS without any codes!
     public func enableAllProtection(completion: ((Bool) -> Void)? = nil) {
+        isLoading = true
         statusMessage = "Đang yêu cầu cấp quyền hệ thống..."
         errorMessage = nil
 
-        // Step 1: Configure & Save NEDNSProxyManager -> Appears in iOS Settings > DNS with App Icon!
-        dnsProxyManager.loadFromPreferences { [weak self] error in
-            guard let self = self else { return }
-            
-            let proto = NEDNSProxyProviderProtocol()
-            proto.providerBundleIdentifier = "com.nextdns.custom.dnsproxy"
-            
-            self.dnsProxyManager.providerProtocol = proto
-            self.dnsProxyManager.localizedDescription = "DNS VIP"
-            self.dnsProxyManager.isEnabled = true
-
-            self.dnsProxyManager.saveToPreferences { [weak self] saveError in
-                DispatchQueue.main.async {
-                    if let saveError = saveError {
-                        NSLog("[DNSManager] DNS Proxy save error: %@", saveError.localizedDescription)
-                        self?.errorMessage = "Chưa cấp quyền: \(saveError.localizedDescription)"
-                    } else {
-                        self?.isProxyInstalled = true
-                        self?.isEnabled = true
-                        self?.statusMessage = "Đang bảo vệ • Đã kích hoạt DNS VIP"
-                        NSLog("[DNSManager] DNS VIP Proxy installed into iOS Settings successfully!")
-                    }
-                }
-            }
-        }
-
-        // Step 2: Configure System-wide DoH Resolver (Cloudflare / Quad9 / NextDNS Public)
-        dnsSettingsManager.loadFromPreferences { [weak self] error in
+        // Step 1: Configure & Save NEDNSSettingsManager
+        // This registers "DNS VIP" directly into iOS Settings > General > VPN & Device Management > DNS with App Icon!
+        dnsSettingsManager.loadFromPreferences { [weak self] loadError in
             guard let self = self else { return }
 
             let doh = NEDNSOverHTTPSSettings(servers: ["1.1.1.1", "1.0.0.1", "2606:4700:4700::1111"])
@@ -92,14 +75,55 @@ public class DNSManager: ObservableObject {
 
             self.dnsSettingsManager.dnsSettings = doh
             self.dnsSettingsManager.localizedDescription = "DNS VIP"
+            self.dnsSettingsManager.onDemandRules = [NEOnDemandRuleConnect()]
 
             self.dnsSettingsManager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
                     if let saveError = saveError {
-                        NSLog("[DNSManager] Settings error: %@", saveError.localizedDescription)
+                        NSLog("[DNSManager] DNS Settings save error: %@", saveError.localizedDescription)
                     } else {
                         self?.isEnabled = true
-                        self?.statusMessage = "Đang bảo vệ • Đã kích hoạt DNS VIP"
+                        self?.isProxyInstalled = true
+                        self?.statusMessage = "Đang bảo vệ • Đã thêm DNS VIP vào Cài đặt"
+                        self?.errorMessage = nil
+                        NSLog("[DNSManager] DNS VIP successfully registered into iOS Settings > DNS!")
+                    }
+                }
+            }
+        }
+
+        // Step 2: Trigger Native iOS VPN Permission Dialog ("DNS VIP" Would Like to Add VPN Configurations)
+        NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
+            guard let self = self else { return }
+            let manager = managers?.first ?? NETunnelProviderManager()
+            self.tunnelManager = manager
+
+            let proto = NETunnelProviderProtocol()
+            proto.providerBundleIdentifier = "com.nextdns.custom.dnsproxy"
+            proto.serverAddress = "1.1.1.1"
+
+            manager.protocolConfiguration = proto
+            manager.localizedDescription = "DNS VIP"
+            manager.isEnabled = true
+
+            manager.saveToPreferences { [weak self] saveError in
+                DispatchQueue.main.async {
+                    self?.isLoading = false
+                    if let saveError = saveError {
+                        NSLog("[DNSManager] VPN save info: %@", saveError.localizedDescription)
+                        // If DNS Settings succeeded, we are already protected!
+                        if self?.isEnabled == true {
+                            self?.statusMessage = "Đã lưu vào Cài đặt • Chọn tick xanh 'DNS VIP' trong DNS"
+                        } else {
+                            self?.errorMessage = "Vui lòng chọn 'Cho phép' khi iOS hỏi quyền thiết bị"
+                        }
+                        completion?(false)
+                    } else {
+                        self?.isEnabled = true
+                        self?.isProxyInstalled = true
+                        self?.errorMessage = nil
+                        self?.statusMessage = "Đang bảo vệ • Đã cấp quyền DNS VIP"
+                        NSLog("[DNSManager] VPN permission granted successfully!")
                         completion?(true)
                     }
                 }
@@ -108,23 +132,31 @@ public class DNSManager: ObservableObject {
     }
 
     public func disableAllProtection() {
+        isLoading = true
         statusMessage = "Đang tắt..."
-        
-        dnsProxyManager.loadFromPreferences { [weak self] _ in
-            self?.dnsProxyManager.removeFromPreferences { _ in
+        errorMessage = nil
+
+        dnsSettingsManager.loadFromPreferences { [weak self] _ in
+            self?.dnsSettingsManager.removeFromPreferences { _ in
                 DispatchQueue.main.async {
                     self?.isProxyInstalled = false
                 }
             }
         }
 
-        dnsSettingsManager.loadFromPreferences { [weak self] _ in
-            self?.dnsSettingsManager.removeFromPreferences { _ in
+        if let manager = tunnelManager {
+            manager.isEnabled = false
+            manager.saveToPreferences { [weak self] _ in
                 DispatchQueue.main.async {
+                    self?.isLoading = false
                     self?.isEnabled = false
                     self?.statusMessage = "Chưa kích hoạt"
                 }
             }
+        } else {
+            isLoading = false
+            isEnabled = false
+            statusMessage = "Chưa kích hoạt"
         }
     }
 
