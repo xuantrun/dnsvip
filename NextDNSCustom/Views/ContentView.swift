@@ -110,8 +110,7 @@ struct ContentView: View {
     private var configSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("CẤU HÌNH NEXTDNS")
-                .font(.caption)
-                .fontWeight(.semibold)
+                .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
 
@@ -167,8 +166,7 @@ struct ContentView: View {
     private var statsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("BẢO MẬT & CHẶN")
-                .font(.caption)
-                .fontWeight(.semibold)
+                .font(.caption.weight(.semibold))
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
 
@@ -206,8 +204,7 @@ struct ContentView: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.footnote)
-                    .fontWeight(.medium)
+                    .font(.footnote.weight(.medium))
                 Text(sub)
                     .font(.caption2)
                     .foregroundColor(.secondary)

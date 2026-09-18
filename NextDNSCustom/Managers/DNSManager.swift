@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import NetworkExtension
+import UIKit
 
 public enum DNSProtocolType: String, CaseIterable, Identifiable {
     case doh = "DNS-over-HTTPS (DoH)"
@@ -34,7 +35,6 @@ public class DNSManager: ObservableObject {
     @Published public var errorMessage: String? = nil
 
     private let dnsSettingsManager = NEDNSSettingsManager.shared()
-    private let dnsProxyManager = NEDNSProxyManager.shared()
 
     private init() {
         self.nextDnsID = UserDefaults.standard.string(forKey: "nextdns_profile_id") ?? ""
@@ -81,7 +81,7 @@ public class DNSManager: ObservableObject {
 
             switch self.selectedProtocol {
             case .doh:
-                let doh = NEDNSOverHTTPSProtocol()
+                let doh = NEDNSOverHTTPSSettings(servers: ["45.90.28.0", "45.90.30.0"])
                 let urlString: String
                 if cleanID.isEmpty {
                     urlString = "https://dns.nextdns.io"
@@ -92,7 +92,7 @@ public class DNSManager: ObservableObject {
                 self.dnsSettingsManager.dnsSettings = doh
 
             case .dot:
-                let dot = NEDNSOverTLSProtocol()
+                let dot = NEDNSOverTLSSettings(servers: ["45.90.28.0", "45.90.30.0"])
                 if cleanID.isEmpty {
                     dot.serverName = "anycast.dns.nextdns.io"
                 } else {
@@ -102,7 +102,6 @@ public class DNSManager: ObservableObject {
             }
 
             self.dnsSettingsManager.localizedDescription = cleanID.isEmpty ? "NextDNS Resolver" : "NextDNS (\(cleanID))"
-            self.dnsSettingsManager.isEnabled = true
 
             self.dnsSettingsManager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
@@ -121,8 +120,7 @@ public class DNSManager: ObservableObject {
     public func disableDNS() {
         dnsSettingsManager.loadFromPreferences { [weak self] error in
             guard let self = self else { return }
-            self.dnsSettingsManager.isEnabled = false
-            self.dnsSettingsManager.saveToPreferences { [weak self] _ in
+            self.dnsSettingsManager.removeFromPreferences { [weak self] _ in
                 DispatchQueue.main.async {
                     self?.isEnabled = false
                 }

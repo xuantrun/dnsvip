@@ -73,7 +73,7 @@ struct BlocklistView: View {
                     Button("Xong") {
                         presentationMode.wrappedValue.dismiss()
                     }
-                    .fontWeight(.semibold)
+                    .font(.body.bold())
                 }
             )
             .sheet(isPresented: $showingAddAlert) {
