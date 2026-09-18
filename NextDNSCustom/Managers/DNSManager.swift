@@ -19,6 +19,40 @@ public class DNSManager: ObservableObject {
 
     private init() {
         loadStatus()
+        
+        // Listen to native iOS VPN status changes (Connecting, Connected, Disconnected)
+        NotificationCenter.default.addObserver(
+            forName: .NEVPNStatusDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleVPNStatusChange()
+        }
+    }
+
+    private func handleVPNStatusChange() {
+        guard let mgr = tunnelManager else { return }
+        switch mgr.connection.status {
+        case .connected:
+            self.isEnabled = true
+            self.isProxyInstalled = true
+            self.statusMessage = "Đang bảo vệ • Đã kích hoạt [VPN] trên thiết bị"
+            self.errorMessage = nil
+            NSLog("[DNSManager] VPN Status: CONNECTED -> [VPN] icon active!")
+        case .connecting:
+            self.statusMessage = "Đang kết nối VPN..."
+        case .disconnecting:
+            self.statusMessage = "Đang ngắt kết nối VPN..."
+        case .disconnected, .invalid:
+            if !dnsSettingsManager.isEnabled {
+                self.isEnabled = false
+                self.statusMessage = "Chưa kích hoạt"
+            }
+        case .reasserting:
+            self.statusMessage = "Đang tái thiết lập VPN..."
+        @unknown default:
+            break
+        }
     }
 
     public func loadStatus() {
@@ -40,10 +74,10 @@ public class DNSManager: ObservableObject {
             DispatchQueue.main.async {
                 if let mgr = managers?.first {
                     self?.tunnelManager = mgr
-                    if mgr.isEnabled {
+                    if mgr.connection.status == .connected || mgr.isEnabled {
                         self?.isEnabled = true
                         self?.isProxyInstalled = true
-                        self?.statusMessage = "Đang bảo vệ • VPN DNS VIP đang hoạt động"
+                        self?.statusMessage = "Đang bảo vệ • VPN DNS VIP đang hoạt động [VPN]"
                         self?.errorMessage = nil
                     }
                 }
@@ -100,31 +134,48 @@ public class DNSManager: ObservableObject {
 
             let proto = NETunnelProviderProtocol()
             proto.providerBundleIdentifier = "com.nextdns.custom.dnsproxy"
-            proto.serverAddress = "1.1.1.1"
+            proto.serverAddress = "127.0.0.1"
 
             manager.protocolConfiguration = proto
             manager.localizedDescription = "DNS VIP"
             manager.isEnabled = true
 
             manager.saveToPreferences { [weak self] saveError in
-                DispatchQueue.main.async {
-                    self?.isLoading = false
-                    if let saveError = saveError {
+                if let saveError = saveError {
+                    DispatchQueue.main.async {
+                        self?.isLoading = false
                         NSLog("[DNSManager] VPN save info: %@", saveError.localizedDescription)
-                        // If DNS Settings succeeded, we are already protected!
                         if self?.isEnabled == true {
                             self?.statusMessage = "Đã lưu vào Cài đặt • Chọn tick xanh 'DNS VIP' trong DNS"
                         } else {
                             self?.errorMessage = "Vui lòng chọn 'Cho phép' khi iOS hỏi quyền thiết bị"
                         }
                         completion?(false)
-                    } else {
-                        self?.isEnabled = true
-                        self?.isProxyInstalled = true
-                        self?.errorMessage = nil
-                        self?.statusMessage = "Đang bảo vệ • Đã cấp quyền DNS VIP"
-                        NSLog("[DNSManager] VPN permission granted successfully!")
-                        completion?(true)
+                    }
+                } else {
+                    // Reload and trigger active tunnel -> Display native [VPN] icon on iPhone!
+                    manager.loadFromPreferences { _ in
+                        do {
+                            try manager.connection.startVPNTunnel()
+                            DispatchQueue.main.async {
+                                self?.isLoading = false
+                                self?.isEnabled = true
+                                self?.isProxyInstalled = true
+                                self?.errorMessage = nil
+                                self?.statusMessage = "Đang bảo vệ • Đã kích hoạt [VPN] trên thiết bị"
+                                NSLog("[DNSManager] startVPNTunnel successful! [VPN] icon active.")
+                                completion?(true)
+                            }
+                        } catch {
+                            DispatchQueue.main.async {
+                                self?.isLoading = false
+                                NSLog("[DNSManager] startVPNTunnel: %@", error.localizedDescription)
+                                self?.isEnabled = true
+                                self?.isProxyInstalled = true
+                                self?.statusMessage = "Đang bảo vệ • Cấu hình VPN đã sẵn sàng"
+                                completion?(true)
+                            }
+                        }
                     }
                 }
             }
@@ -133,30 +184,23 @@ public class DNSManager: ObservableObject {
 
     public func disableAllProtection() {
         isLoading = true
-        statusMessage = "Đang tắt..."
+        statusMessage = "Đang tắt bảo vệ..."
         errorMessage = nil
 
-        dnsSettingsManager.loadFromPreferences { [weak self] _ in
-            self?.dnsSettingsManager.removeFromPreferences { _ in
-                DispatchQueue.main.async {
-                    self?.isProxyInstalled = false
-                }
+        // Stop active VPN tunnel
+        tunnelManager?.connection.stopVPNTunnel()
+        tunnelManager?.isEnabled = false
+        tunnelManager?.saveToPreferences { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.isLoading = false
+                self?.isEnabled = false
+                self?.isProxyInstalled = false
+                self?.statusMessage = "Chưa kích hoạt"
             }
         }
 
-        if let manager = tunnelManager {
-            manager.isEnabled = false
-            manager.saveToPreferences { [weak self] _ in
-                DispatchQueue.main.async {
-                    self?.isLoading = false
-                    self?.isEnabled = false
-                    self?.statusMessage = "Chưa kích hoạt"
-                }
-            }
-        } else {
-            isLoading = false
-            isEnabled = false
-            statusMessage = "Chưa kích hoạt"
+        dnsSettingsManager.loadFromPreferences { [weak self] _ in
+            self?.dnsSettingsManager.removeFromPreferences { _ in }
         }
     }
 
