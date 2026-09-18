@@ -3,7 +3,7 @@ import NetworkExtension
 
 public class DNSProxyProvider: NEPacketTunnelProvider {
 
-    public override func startTunnel(options: [String : Any]?, completionHandler: @escaping (Error?) -> Void) {
+    public override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         NSLog("[DNS VIP] Packet Tunnel starting...")
 
         // Configure virtual network tunnel for DNS VIP
