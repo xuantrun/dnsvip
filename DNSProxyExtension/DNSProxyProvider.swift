@@ -69,7 +69,7 @@ public class DNSProxyProvider: NEDNSProxyProvider {
             if blocked {
                 NSLog("[NextDNSProxy] BLOCKED query: %@", domain)
                 if let response = createBlockedDNSResponse(for: packet) {
-                    flow.writeDatagrams([response], sentByEndpoints: [endpoint]) { _ in }
+                    flow.writeDatagrams([response], sentBy: [endpoint]) { _ in }
                     return
                 }
             } else {
@@ -78,7 +78,7 @@ public class DNSProxyProvider: NEDNSProxyProvider {
         }
 
         // Forward normal packet
-        flow.writeDatagrams([packet], sentByEndpoints: [endpoint]) { _ in }
+        flow.writeDatagrams([packet], sentBy: [endpoint]) { _ in }
     }
 
     // MARK: - TCP DNS Handling
