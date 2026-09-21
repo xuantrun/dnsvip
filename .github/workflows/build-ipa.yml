@@ -36,14 +36,14 @@ jobs:
           mkdir -p build/Payload
           cp -r "build/derivedData/Build/Products/Release-iphoneos/DNS VIP.app" build/Payload/
           cd build
-          zip -qry DNS-VIP-v2.3.5.ipa Payload
-          cp DNS-VIP-v2.3.5.ipa NextDNS-Custom-Blocked.ipa
+          zip -qry DNS-VIP-v2.3.6.ipa Payload
+          cp DNS-VIP-v2.3.6.ipa NextDNS-Custom-Blocked.ipa
           ls -la *.ipa
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DNS-VIP-v2.3.5-IPA
-          path: build/DNS-VIP-v2.3.5.ipa
+          name: DNS-VIP-v2.3.6-IPA
+          path: build/DNS-VIP-v2.3.6.ipa
           retention-days: 30

@@ -65,6 +65,9 @@ struct DashboardView: View {
                         brandHeader
                             .padding(.top, 6)
 
+                        // 24/7 Background Activation Alert (NextDNS Native Mode)
+                        backgroundAlertCard
+
                         // Center Hero Status & Toggle Card
                         heroStatusCard
 
@@ -139,6 +142,69 @@ struct DashboardView: View {
             .padding(.vertical, 5)
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .cornerRadius(12)
+        }
+    }
+
+    // MARK: - 24/7 Background Activation Card (NextDNS Native Mode)
+    private var backgroundAlertCard: some View {
+        Group {
+            if !dnsManager.isNativeDNSActive {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                            .font(.system(size: 16))
+                        Text("KÍCH HOẠT CHẠY NGẦM 24/7 (NHƯ NEXTDNS)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.primary)
+                    }
+
+                    Text("Để DNS VIP chạy ngầm 24/7 kể cả khi thoát app, hãy vào Cài đặt -> VPN & Quản lý thiết bị -> DNS -> Nhấn chọn tick xanh vào 'DNS VIP'.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .lineSpacing(2)
+
+                    Button(action: {
+                        dnsManager.openDNSSettings()
+                    }) {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "checkmark.seal.fill")
+                            Text("Mở Cài đặt để chọn tick xanh 'DNS VIP'")
+                                .font(.system(size: 13, weight: .bold))
+                            Spacer()
+                        }
+                        .padding(.vertical, 10)
+                        .background(Color.blue)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                    }
+                }
+                .padding(14)
+                .background(Color.orange.opacity(0.12))
+                .cornerRadius(14)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.orange.opacity(0.35), lineWidth: 1)
+                )
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.shield.fill")
+                        .foregroundColor(.green)
+                        .font(.system(size: 16))
+                    Text("Đã kích hoạt chạy ngầm 24/7 qua hệ thống iOS")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.green)
+                    Spacer()
+                }
+                .padding(12)
+                .background(Color.green.opacity(0.12))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                )
+            }
         }
     }
 
@@ -381,7 +447,7 @@ struct DashboardView: View {
                 Divider()
                 specRow(title: "Giao thức", value: "DNS-over-HTTPS & Packet Tunnel")
                 Divider()
-                specRow(title: "Máy chủ upstream", value: "Cloudflare Anycast (1.1.1.1)")
+                specRow(title: "Máy chủ upstream", value: "NextDNS VIP & Cloudflare Anycast")
                 Divider()
                 specRow(title: "Quy tắc lọc active", value: "\(BlockList.getExactDomains().count + BlockList.getWildcards().count) quy tắc")
             }
@@ -498,7 +564,7 @@ struct SystemInfoView: View {
                     HStack {
                         Text("Phiên bản")
                         Spacer()
-                        Text("2.0.0 (Build 1)")
+                        Text("2.3.6 (Build 1)")
                             .foregroundColor(.secondary)
                     }
                 }

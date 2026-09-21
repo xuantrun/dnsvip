@@ -8,6 +8,7 @@ public class DNSManager: ObservableObject {
 
     @Published public var isEnabled: Bool = false
     @Published public var isProxyInstalled: Bool = false
+    @Published public var isNativeDNSActive: Bool = false
     @Published public var isVerifying: Bool = false
     @Published public var statusMessage: String = "Sẵn sàng bảo vệ"
     @Published public var upstreamServer: String = "NextDNS VIP (b8fe9c)"
@@ -28,6 +29,15 @@ public class DNSManager: ObservableObject {
         ) { [weak self] _ in
             self?.handleVPNStatusChange()
         }
+
+        // Observe app becoming active to re-check DNS settings
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.loadStatus()
+        }
     }
 
     private func handleVPNStatusChange() {
@@ -36,10 +46,10 @@ public class DNSManager: ObservableObject {
         case .connected:
             self.isEnabled = true
             self.isProxyInstalled = true
-            self.statusMessage = "Đang bảo vệ • [VPN] và DNS VIP đang hoạt động"
+            self.statusMessage = "Đang bảo vệ 24/7 • [VPN] và DNS VIP đang chạy ngầm"
             self.errorMessage = nil
             QueryLogManager.shared.fetchLogsFromTunnel()
-            NSLog("[DNSManager] VPN Status: CONNECTED -> Active [VPN] protection!")
+            NSLog("[DNSManager] VPN Status: CONNECTED -> Active 24/7 [VPN] protection!")
         case .connecting:
             self.statusMessage = "Đang kết nối VPN..."
         case .disconnecting:
@@ -60,10 +70,13 @@ public class DNSManager: ObservableObject {
         // 1. Check NEDNSSettingsManager (iOS Settings > DNS with App Icon)
         dnsSettingsManager.loadFromPreferences { [weak self] _ in
             DispatchQueue.main.async {
-                if self?.dnsSettingsManager.isEnabled == true {
+                let active = self?.dnsSettingsManager.isEnabled == true
+                self?.isNativeDNSActive = active
+                if active {
                     self?.isEnabled = true
                     self?.isProxyInstalled = true
-                    self?.statusMessage = "Đang bảo vệ • DNS VIP đã kích hoạt"
+                    self?.statusMessage = "Đang bảo vệ 24/7 • DNS VIP hệ thống iOS đang chạy ngầm"
+                    NSLog("[DNSManager] NEDNSSettingsManager is ACTIVE in iOS Settings!")
                 }
             }
         }
@@ -73,10 +86,10 @@ public class DNSManager: ObservableObject {
             DispatchQueue.main.async {
                 if let mgr = managers?.first {
                     self?.tunnelManager = mgr
-                    if mgr.connection.status == .connected || mgr.isEnabled {
+                    if mgr.connection.status == .connected || (mgr.isEnabled && mgr.isOnDemandEnabled) {
                         self?.isEnabled = true
                         self?.isProxyInstalled = true
-                        self?.statusMessage = "Đang bảo vệ • [VPN] và DNS VIP đang hoạt động"
+                        self?.statusMessage = "Đang bảo vệ 24/7 • [VPN] và DNS VIP đang chạy ngầm"
                         self?.errorMessage = nil
                         QueryLogManager.shared.fetchLogsFromTunnel()
                     }
@@ -105,7 +118,7 @@ public class DNSManager: ObservableObject {
         dnsSettingsManager.loadFromPreferences { [weak self] loadError in
             guard let self = self else { return }
 
-            let doh = NEDNSOverHTTPSSettings(servers: [
+            let doh = NEDDNSOverHTTPSSettings(servers: [
                 "45.90.28.0",
                 "45.90.30.0",
                 "2a07:a8c0::0",
@@ -115,14 +128,16 @@ public class DNSManager: ObservableObject {
 
             self.dnsSettingsManager.dnsSettings = doh
             self.dnsSettingsManager.localizedDescription = "DNS VIP"
-            self.dnsSettingsManager.onDemandRules = [NEOnDemandRuleConnect()]
+            
+            let connectRule = NEOnDemandRuleConnect()
+            connectRule.interfaceTypeMatch = .any
+            self.dnsSettingsManager.onDemandRules = [connectRule]
 
             self.dnsSettingsManager.saveToPreferences { [weak self] saveError in
                 DispatchQueue.main.async {
                     if let saveError = saveError {
                         NSLog("[DNSManager] DNS Settings save info: %@", saveError.localizedDescription)
                     } else {
-                        self?.isEnabled = true
                         self?.isProxyInstalled = true
                         NSLog("[DNSManager] DNS VIP successfully registered into iOS Settings > DNS!")
                     }
@@ -130,8 +145,8 @@ public class DNSManager: ObservableObject {
             }
         }
 
-        // STEP 2: Configure & Trigger Native iOS VPN Tunnel
-        // This shows the [VPN] icon on iPhone status bar!
+        // STEP 2: Configure & Trigger Native iOS VPN Tunnel with 24/7 On-Demand
+        // This shows the [VPN] icon on iPhone status bar and persists across app exits!
         NETunnelProviderManager.loadAllFromPreferences { [weak self] managers, error in
             guard let self = self else { return }
             let manager = managers?.first ?? NETunnelProviderManager()
@@ -144,6 +159,12 @@ public class DNSManager: ObservableObject {
             manager.protocolConfiguration = proto
             manager.localizedDescription = "DNS VIP"
             manager.isEnabled = true
+
+            // PERSIST 24/7 IN BACKGROUND:
+            manager.isOnDemandEnabled = true
+            let onDemandRule = NEOnDemandRuleConnect()
+            onDemandRule.interfaceTypeMatch = .any
+            manager.onDemandRules = [onDemandRule]
 
             manager.saveToPreferences { [weak self] saveError in
                 guard let self = self else { return }
@@ -168,7 +189,7 @@ public class DNSManager: ObservableObject {
                                 self.isEnabled = true
                                 self.isProxyInstalled = true
                                 self.errorMessage = nil
-                                self.statusMessage = "Đang bảo vệ • Đã kích hoạt [VPN]"
+                                self.statusMessage = "Đang bảo vệ 24/7 • Đã kích hoạt [VPN]"
                                 NSLog("[DNSManager] startVPNTunnel successful! [VPN] icon active.")
                                 QueryLogManager.shared.fetchLogsFromTunnel()
                                 QueryLogManager.shared.startActiveMonitoring()
@@ -179,7 +200,7 @@ public class DNSManager: ObservableObject {
                                 self.isLoading = false
                                 self.isEnabled = true
                                 self.isProxyInstalled = true
-                                self.statusMessage = "Đang bảo vệ qua DNS VIP"
+                                self.statusMessage = "Đang bảo vệ 24/7 qua DNS VIP"
                                 QueryLogManager.shared.startActiveMonitoring()
                                 completion?(true)
                             }
@@ -195,6 +216,8 @@ public class DNSManager: ObservableObject {
         statusMessage = "Đang tắt bảo vệ..."
         errorMessage = nil
 
+        tunnelManager?.isOnDemandEnabled = false
+        tunnelManager?.onDemandRules = []
         tunnelManager?.connection.stopVPNTunnel()
         tunnelManager?.isEnabled = false
         tunnelManager?.saveToPreferences { [weak self] _ in
@@ -208,6 +231,14 @@ public class DNSManager: ObservableObject {
 
         dnsSettingsManager.loadFromPreferences { [weak self] _ in
             self?.dnsSettingsManager.removeFromPreferences { _ in }
+        }
+    }
+
+    public func openDNSSettings() {
+        if let url = URL(string: "App-Prefs:root=General&path=ManagedConfigurationList"), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        } else if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
 
