@@ -60,7 +60,7 @@ public struct BlockList {
 
     public static func getExactDomains() -> [String] {
         let defaults = UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
-        if let stored = defaults.stringArray(forKey: exactKey) {
+        if let stored = defaults.stringArray(forKey: exactKey), !stored.isEmpty {
             return stored
         }
         return defaultExactDomains
@@ -68,7 +68,7 @@ public struct BlockList {
 
     public static func getWildcards() -> [String] {
         let defaults = UserDefaults(suiteName: userDefaultsSuite) ?? UserDefaults.standard
-        if let stored = defaults.stringArray(forKey: wildcardKey) {
+        if let stored = defaults.stringArray(forKey: wildcardKey), !stored.isEmpty {
             return stored
         }
         return defaultWildcards

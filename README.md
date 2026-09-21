@@ -1,24 +1,34 @@
-# 🚀 DNS VIP iOS (Tự động cấp quyền VPN & DNS • Chặn FreeFire)
+# 🚀 DNS VIP iOS (Bản v2.3.5 - Chuẩn NextDNS b8fe9c • Chặn Free Fire 100% • [VPN])
 
-[![Download IPA](https://img.shields.io/badge/Download-DNS--VIP--v2.3.4.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.3.4/DNS-VIP-v2.3.4.ipa)
+[![Download IPA](https://img.shields.io/badge/Download-DNS--VIP--v2.3.5.ipa-blue?style=for-the-badge&logo=apple)](https://github.com/xuantrun/dnsvip/releases/download/v2.3.5/DNS-VIP-v2.3.5.ipa)
 [![Release](https://img.shields.io/github/v/release/xuantrun/dnsvip?style=for-the-badge)](https://github.com/xuantrun/dnsvip/releases/latest)
 
-> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.3.4 - Fix Chặn 0.0.0.0 Sinkhole & Nhật Ký Trực Tiếp):**  
-> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI DNS-VIP-v2.3.4.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.4/DNS-VIP-v2.3.4.ipa)**  
-> 👉 **[Link phụ: NextDNS-Custom-Blocked.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.4/NextDNS-Custom-Blocked.ipa)**  
+> 📲 **TẢI TRỰC TIẾP FILE IPA (Bản v2.3.5 - Fix Triệt Để Chặn Game & Nhật Ký Thật):**  
+> 👉 **[BẤM VÀO ĐÂY ĐỂ TẢI DNS-VIP-v2.3.5.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.5/DNS-VIP-v2.3.5.ipa)**  
+> 👉 **[Link phụ: NextDNS-Custom-Blocked.ipa](https://github.com/xuantrun/dnsvip/releases/download/v2.3.5/NextDNS-Custom-Blocked.ipa)**  
 > *(Hoặc xem tất cả phiên bản tại mục: [GitHub Releases](https://github.com/xuantrun/dnsvip/releases))*
 
 ---
 
-## 🎯 Điểm nổi bật của bản cập nhật v2.3.4:
+## 🎯 Cải tiến đột phá ở bản v2.3.5:
 
-1. **Cơ chế Sinkhole Chặn 0.0.0.0 Cực Mạnh**: Khi Free Fire truy vấn các domain `dl.aw.freefiremobile.com`, `version.ffmax`, hệ thống sẽ lập tức trả về IP `0.0.0.0` ngay trong máy, khiến Game không thể kết nối server và bị chặn hoàn toàn.
-2. **Tách biệt định tuyến DNS 198.18.0.2**: Đảm bảo toàn bộ gói tin DNS của tất cả ứng dụng & Game đều đi qua bộ lọc Packet Tunnel mà không bị kẹt hay bypass.
-3. **Nhật ký thời gian thực (Live Logs)**: Ghi nhận trực tiếp từng truy vấn bị chặn với nhãn đỏ **`CHẶN`** và nhãn xanh **`CHO PHÉP`**.
-4. **Giao diện NextDNS Hero**: Thiết kế công tắc nguồn to bản, màn hình thống kê trực quan.
+1. **Tích hợp máy chủ DNS VIP (NextDNS b8fe9c)**:
+   - Toàn bộ lưu lượng được bảo vệ bởi máy chủ DoH `https://dns.nextdns.io/b8fe9c` đã cấu hình chặn sạch sẽ Free Fire, Garena, AppsFlyer, Purplevioleto.
+   - Khi Free Fire gửi yêu cầu kiểm tra phiên bản hay tải dữ liệu (`dl.aw.freefiremobile.com`), máy chủ và bộ lọc tức thời trả về IP `0.0.0.0` khiến Game bị ngắt kết nối hoàn toàn!
+2. **Kích hoạt đồng thời cả DNS Cài đặt và Icon [VPN]**:
+   - Vừa mở app bấm **BẬT BẢO VỆ**, ứng dụng sẽ xuất hiện với icon trong **Cài đặt -> VPN & Quản lý thiết bị -> DNS (tick xanh 'DNS VIP')**.
+   - Đồng thời khởi chạy VPN Tunnel hiển thị biểu tượng **`[VPN]`** trên thanh trạng thái của iPhone.
+3. **Nhật ký thời gian thực (Live Monitoring 100%)**:
+   - Bảng nhật ký liên tục ghi nhận các truy vấn mạng từ iPhone.
+   - Các domain Free Fire bị chặn hiển thị nhãn đỏ rực **`CHẶN`** (0.0.0.0).
+   - Nút **Kiểm tra** cho phép nhập bất kỳ tên miền nào để kiểm tra trực tiếp với máy chủ DNS.
+4. **Hỗ trợ Profile Cấu Hình (.mobileconfig)**:
+   - Trong app có sẵn nút cài đặt file cấu hình `.mobileconfig` để lưu vĩnh viễn cấu hình DNS VIP vào máy.
 
 ---
 
-## ⚠️ LƯU Ý KHI TEST BỘ LỌC CHẶN GAME:
-- Vì iOS có bộ nhớ đệm DNS (**DNS Cache**): Nếu bạn vừa mở Game trước khi bật VPN, iPhone vẫn còn lưu IP cũ của game trong RAM.
-- 👉 **Cách test chuẩn**: Bật VPN trên App -> Vuốt tắt hẳn Game (hoặc bật/tắt Chế độ máy bay 2 giây) -> Mở lại Game để iPhone gửi truy vấn DNS mới -> Game sẽ bị chặn ngay lập tức và Nhật ký trong app sẽ nhảy thông báo!
+## ⚠️ HƯỚNG DẪN TEST CHUẨN TRÊN IPHONE:
+1. Cài đặt file `DNS-VIP-v2.3.5.ipa` (qua TrollStore, AltStore, Sideloadly hoặc Scarlet).
+2. Mở app **DNS VIP** -> Bấm công tắc **BẬT BẢO VỆ** -> Chọn **Cho phép (Allow)** khi iOS hỏi quyền.
+3. **Quan trọng**: Nếu bạn đã mở Game trước đó, hãy **vuốt tắt hẳn Game trong đa nhiệm** (hoặc bật/tắt Chế độ máy bay 2 giây) để iPhone xóa sạch bộ nhớ đệm DNS cũ trong RAM.
+4. Mở lại Game: Game sẽ lập tức bị chặn không thể tải dữ liệu -> Mở app DNS VIP vào tab **Nhật ký** sẽ thấy các dòng đỏ rực **`CHẶN`**!

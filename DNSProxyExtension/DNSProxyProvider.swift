@@ -144,9 +144,9 @@ public class DNSProxyProvider: NEPacketTunnelProvider {
         QueryLogManager.appendLog(domain: domain, isBlocked: isBlocked, queryType: "A", clientProtocol: "VPN")
     }
 
-    // MARK: - Upstream Forwarding via UDP 1.1.1.1:53
+    // MARK: - Upstream Forwarding via UDP 45.90.28.0:53 (NextDNS Anycast)
     private func forwardUpstreamDNS(dnsPayload: Data, completion: @escaping (Data?) -> Void) {
-        let host = NWEndpoint.Host("1.1.1.1")
+        let host = NWEndpoint.Host("45.90.28.0")
         let port = NWEndpoint.Port(rawValue: 53)!
         let connection = NWConnection(host: host, port: port, using: .udp)
 

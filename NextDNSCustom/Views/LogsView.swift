@@ -290,8 +290,7 @@ struct LogsView: View {
                         .disableAutocorrection(true)
 
                     Button(action: {
-                        let blocked = BlockList.isBlocked(domain: testDomainInput)
-                        logManager.addLog(domain: testDomainInput, isBlocked: blocked, queryType: "A", clientProtocol: "DoH/Test")
+                        logManager.testDomainOnline(domain: testDomainInput) { _ in }
                         showingTestSheet = false
                     }) {
                         HStack {

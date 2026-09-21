@@ -36,34 +36,14 @@ jobs:
           mkdir -p build/Payload
           cp -r "build/derivedData/Build/Products/Release-iphoneos/DNS VIP.app" build/Payload/
           cd build
-          zip -qry DNS-VIP-v2.3.4.ipa Payload
-          cp DNS-VIP-v2.3.4.ipa NextDNS-Custom-Blocked.ipa
+          zip -qry DNS-VIP-v2.3.5.ipa Payload
+          cp DNS-VIP-v2.3.5.ipa NextDNS-Custom-Blocked.ipa
           ls -la *.ipa
           cd ..
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DNS-VIP-v2.3.4-IPA
-          path: build/DNS-VIP-v2.3.4.ipa
+          name: DNS-VIP-v2.3.5-IPA
+          path: build/DNS-VIP-v2.3.5.ipa
           retention-days: 30
-
-      - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v2.3.4
-          name: "DNS VIP iOS v2.3.4 (Fix Triệt Để Chặn 0.0.0.0 Sinkhole • Giao Diện NextDNS • Nhật Ký Trực Tiếp)"
-          body: |
-            ## 🚀 DNS VIP iOS App v2.3.4 (Cơ Chế Chặn Sinkhole 0.0.0.0 & Nhật Ký Thật)
-            
-            - 🛑 **Cơ Chế Chặn 0.0.0.0 Sinkhole Trực Tiếp**: Trả về IP `0.0.0.0` ngay lập tức trong 0ms khi phát hiện truy vấn game (Free Fire `dl.aw.freefiremobile.com`, `version.ffmax`, AppsFlyer, Garena), ngắt kết nối game triệt để.
-            - 📡 **Tách Biệt DNS Server 198.18.0.2**: Tách biệt hoàn toàn khỏi Interface IP, buộc iOS kernel đẩy 100% gói tin DNS qua `NEPacketTunnelProvider` để kiểm duyệt & ghi log.
-            - 📋 **Nhật Ký DNS Hoạt Động 100%**: Ghi nhận thời gian thực từng domain, nhãn `[Free Fire]`, `CHẶN` / `CHO PHÉP`.
-            - 🛡️ **Kích Hoạt Icon [VPN] Trên iPhone**: Hoàn thiện Packet Tunnel Provider.
-            - 🎨 **Giao Diện NextDNS Hero**: Cần gạt công tắc nguồn to bản, màn hình trực quan.
-          files: |
-            build/DNS-VIP-v2.3.4.ipa
-            build/NextDNS-Custom-Blocked.ipa
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

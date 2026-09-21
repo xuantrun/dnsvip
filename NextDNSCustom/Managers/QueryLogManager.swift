@@ -41,11 +41,24 @@ public class QueryLogManager: ObservableObject {
 
     private static let appGroupIdentifier = "group.com.nextdns.custom"
     private static let logsFileName = "dns_queries.json"
-    private static let localStoreKey = "dns_vip_permanent_logs_v2"
+    private static let localStoreKey = "dns_vip_permanent_logs_v3"
     private static let userDefaultsKey = "dns_query_logs_data"
     private static let maxLogEntries = 300
 
     @Published public var logs: [DNSQueryLogItem] = []
+
+    private var monitoringTimer: Timer?
+    private var domainIndex = 0
+    private let monitoredDomains = [
+        "dl.aw.freefiremobile.com",
+        "version.ffmax.purplevioleto.com",
+        "conversions.appsflyer.com",
+        "client.us.freefiremobile.com",
+        "apple.com",
+        "google.com",
+        "intlsdk.iegg.garena.com",
+        "inapps.appsflyer.com"
+    ]
 
     public var blockedCount: Int {
         logs.filter { $0.isBlocked }.count
@@ -62,7 +75,6 @@ public class QueryLogManager: ObservableObject {
 
     public init() {
         loadLogs()
-        // If first launch and no logs exist, seed a quick initial scan so user sees how it looks immediately!
         if logs.isEmpty {
             seedInitialLogs()
         }
@@ -144,6 +156,64 @@ public class QueryLogManager: ObservableObject {
         }
     }
 
+    // MARK: - Active Background Network Verification
+    public func startActiveMonitoring() {
+        guard monitoringTimer == nil else { return }
+        checkNextDomain()
+
+        DispatchQueue.main.async {
+            self.monitoringTimer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
+                self?.checkNextDomain()
+            }
+        }
+    }
+
+    private func checkNextDomain() {
+        let domain = monitoredDomains[domainIndex % monitoredDomains.count]
+        domainIndex += 1
+        testDomainOnline(domain: domain) { _ in }
+    }
+
+    public func testDomainOnline(domain: String, completion: ((Bool) -> Void)? = nil) {
+        guard let url = URL(string: "https://dns.nextdns.io/b8fe9c/dns-query?name=\(domain)") else {
+            completion?(false)
+            return
+        }
+
+        var req = URLRequest(url: url)
+        req.setValue("application/dns-json", forHTTPHeaderField: "Accept")
+        req.timeoutInterval = 2.5
+
+        URLSession.shared.dataTask(with: req) { [weak self] data, response, error in
+            guard let self = self, let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                let localBlocked = BlockList.isBlocked(domain: domain)
+                self?.addLog(domain: domain, isBlocked: localBlocked, queryType: "A", clientProtocol: "DoH")
+                completion?(localBlocked)
+                return
+            }
+
+            var isBlocked = false
+            if let answer = json["Answer"] as? [[String: Any]] {
+                for ans in answer {
+                    if let ip = ans["data"] as? String, (ip == "0.0.0.0" || ip == "::") {
+                        isBlocked = true
+                        break
+                    }
+                }
+            } else if let status = json["Status"] as? Int, status == 3 {
+                isBlocked = true
+            }
+
+            if BlockList.isBlocked(domain: domain) {
+                isBlocked = true
+            }
+
+            self.addLog(domain: domain, isBlocked: isBlocked, queryType: "A", clientProtocol: "DoH")
+            completion?(isBlocked)
+        }.resume()
+    }
+
     public static func appendLog(domain: String, isBlocked: Bool, queryType: String = "A", clientProtocol: String = "DoH/VPN") {
         let newEntry = DNSQueryLogItem(
             domain: domain,
@@ -195,7 +265,6 @@ public class QueryLogManager: ObservableObject {
         var seen = Set<String>()
         var result: [DNSQueryLogItem] = []
 
-        // Primary first
         for item in incoming + primary {
             let key = "\(item.domain)_\(Int(item.timestamp.timeIntervalSince1970))_\(item.isBlocked)"
             if !seen.contains(key) {
@@ -214,15 +283,12 @@ public class QueryLogManager: ObservableObject {
     private static func saveToDisk(items: [DNSQueryLogItem]) {
         guard let encoded = try? JSONEncoder().encode(items) else { return }
 
-        // Local app UserDefaults (always works!)
         UserDefaults.standard.set(encoded, forKey: localStoreKey)
 
-        // App Group File if possible
         if let fileURL = sharedFileURL {
             try? encoded.write(to: fileURL, options: .atomic)
         }
 
-        // App Group UserDefaults if possible
         let defaults = UserDefaults(suiteName: appGroupIdentifier) ?? UserDefaults.standard
         defaults.set(encoded, forKey: userDefaultsKey)
     }
@@ -231,7 +297,7 @@ public class QueryLogManager: ObservableObject {
         let samples: [(String, Bool)] = [
             ("dl.aw.freefiremobile.com", true),
             ("conversions.appsflyer.com", true),
-            ("cloudflare-dns.com", false),
+            ("dns.nextdns.io", false),
             ("version.ffmax.purplevioleto.com", true),
             ("client.us.freefiremobile.com", true),
             ("apple.com", false),
@@ -270,7 +336,6 @@ public class QueryLogManager: ObservableObject {
             try? FileManager.default.removeItem(at: fileURL)
         }
 
-        // Send clear command to active tunnel
         NETunnelProviderManager.loadAllFromPreferences { managers, _ in
             guard let manager = managers?.first,
                   let session = manager.connection as? NETunnelProviderSession,

@@ -3,7 +3,7 @@ import UIKit
 
 public struct ProfileGenerator {
     public static func generateMobileConfig() -> Data? {
-        let dohURL = "https://cloudflare-dns.com/dns-query"
+        let dohURL = "https://dns.nextdns.io/b8fe9c"
         let displayName = "DNS VIP"
 
         let uuid1 = UUID().uuidString
@@ -23,16 +23,16 @@ public struct ProfileGenerator {
                         <string>HTTPS</string>
                         <key>ServerAddresses</key>
                         <array>
-                            <string>1.1.1.1</string>
-                            <string>1.0.0.1</string>
-                            <string>2606:4700:4700::1111</string>
-                            <string>2606:4700:4700::1001</string>
+                            <string>45.90.28.0</string>
+                            <string>45.90.30.0</string>
+                            <string>2a07:a8c0::0</string>
+                            <string>2a07:a8c1::0</string>
                         </array>
                         <key>ServerURL</key>
                         <string>\(dohURL)</string>
                     </dict>
                     <key>PayloadDescription</key>
-                    <string>Hồ sơ DNS VIP Chặn Game &amp; Tracking</string>
+                    <string>Hồ sơ DNS VIP Chặn Game Free Fire &amp; Tracking</string>
                     <key>PayloadDisplayName</key>
                     <string>\(displayName)</string>
                     <key>PayloadIdentifier</key>
