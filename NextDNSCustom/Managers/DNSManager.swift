@@ -118,7 +118,7 @@ public class DNSManager: ObservableObject {
         dnsSettingsManager.loadFromPreferences { [weak self] loadError in
             guard let self = self else { return }
 
-            let doh = NEDDNSOverHTTPSSettings(servers: [
+            let doh = NEDNSOverHTTPSSettings(servers: [
                 "45.90.28.0",
                 "45.90.30.0",
                 "2a07:a8c0::0",
